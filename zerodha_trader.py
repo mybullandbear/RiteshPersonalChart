@@ -4,6 +4,15 @@ from datetime import datetime
 
 TRADING_STATE_FILE = "trading_state.json"
 
+def log_message(msg):
+    """Appends live status stream to bot_log.txt"""
+    try:
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        with open('bot_log.txt', 'a') as f:
+            f.write(f"[{timestamp}] {msg}\n")
+    except: pass
+
 class PaperTrader:
     def __init__(self):
         self.config_file = "config.json"
@@ -97,6 +106,7 @@ class PaperTrader:
             "entry_reason": reason
         }
         self.save_trading_state(state)
+        log_message(f"🚀 {symbol} Entry: SELL {option_type} {atm_strike} @ {option_price} (Reason: {reason})")
         print(f"[{symbol}] Paper Entry: SELL {option_type} {atm_strike} @ {option_price}")
         
     def update_pnl(self, symbol, current_ltp):
@@ -178,6 +188,7 @@ class PaperTrader:
             
             state["positions"][symbol] = None
             self.save_trading_state(state)
+            log_message(f"🛑 {symbol} Position Closed: {reason}")
             print(f"[{symbol}] Paper Position Closed: {reason}")
             
 

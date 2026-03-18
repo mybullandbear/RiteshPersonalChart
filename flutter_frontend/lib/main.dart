@@ -243,6 +243,8 @@ class _TradingDashboardState extends State<TradingDashboard> {
             if (!_initialLoading && _error == null)
               _GlobalSignalsBar(summary: _summary),
             Expanded(child: _buildBody()),
+            if (!_initialLoading && _error == null)
+              _LogsPanel(api: _api),
           ]),
         ],
       ),
@@ -581,6 +583,16 @@ class _GlobalSignalsBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String nSig = summary['NIFTY']?.signal ?? '';
+    final String bSig = summary['BANKNIFTY']?.signal ?? '';
+    bool bullish = nSig.contains('BUY') && bSig.contains('BUY');
+    bool bearish = nSig.contains('SELL') && bSig.contains('SELL');
+    
+    String conf = "NEUTRAL 🟡";
+    Color confColor = Colors.amber;
+    if (bullish) { conf = "BULLISH CONFLUENCE 🟢"; confColor = kGreen; }
+    else if (bearish) { conf = "BEARISH CONFLUENCE 🔴"; confColor = kRed; }
+
     return Container(
       height: 40,
       decoration: const BoxDecoration(
@@ -592,7 +604,20 @@ class _GlobalSignalsBar extends StatelessWidget {
         child: Row(
           children: [
             Expanded(child: _SignalCard(symbol: 'NIFTY', accent: kNifty, summary: summary['NIFTY'])),
-            const VerticalDivider(color: Colors.white10, width: 24, indent: 10, endIndent: 10),
+            
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: confColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: confColor.withOpacity(0.3), width: 1.0)
+              ),
+              child: Text(
+                conf,
+                style: TextStyle(color: confColor, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+              ),
+            ),
+
             Expanded(child: _SignalCard(symbol: 'BANKNIFTY', accent: kBank, summary: summary['BANKNIFTY'])),
           ],
         ),
@@ -1878,5 +1903,95 @@ class _LoginScreenState extends State<_LoginScreen> {
          )
        )
      );
+  }
+}
+class _LogsPanel extends StatefulWidget {
+  final ApiService api;
+  const _LogsPanel({required this.api});
+
+  @override
+  State<_LogsPanel> createState() => _LogsPanelState();
+}
+
+class _LogsPanelState extends State<_LogsPanel> {
+  bool _expanded = false;
+  List<String> _logs = [];
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+    _timer = Timer.periodic(const Duration(seconds: 4), (_) => _fetch());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _fetch() async {
+    try {
+      final l = await widget.api.getLogs();
+      if (mounted) setState(() { _logs = l; });
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      height: _expanded ? 200 : 40,
+      decoration: const BoxDecoration(
+        color: kSurface,
+        border: Border(top: BorderSide(color: Colors.white10, width: 0.5)),
+      ),
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Container(
+              height: 40,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              color: kSurface2,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(children: [
+                    const Icon(Icons.code, color: kAccent, size: 16),
+                    const SizedBox(width: 8),
+                    const Text('LIVE SYSTEM LOGS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1, color: Colors.white70)),
+                  ]),
+                  Icon(_expanded ? Icons.expand_more : Icons.expand_less, color: Colors.white54, size: 18)
+                ],
+              ),
+            ),
+          ),
+          
+          if (_expanded)
+            Expanded(
+              child: _logs.isEmpty 
+                ? const Center(child: Text('Connecting to Log Stream...', style: TextStyle(color: Colors.white24, fontSize: 11)))
+                : ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: _logs.length,
+                    itemBuilder: (context, i) {
+                       final l = _logs[i];
+                       Color color = Colors.white70;
+                       if (l.contains('🚀')) color = kAccent;
+                       else if (l.contains('🛑')) color = kRed;
+                       else if (l.contains('📊')) color = kGreen;
+
+                       return Padding(
+                         padding: const EdgeInsets.only(bottom: 4),
+                         child: Text(l, style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: color)),
+                       );
+                    }
+                  )
+            )
+        ],
+      ),
+    );
   }
 }

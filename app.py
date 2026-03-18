@@ -841,6 +841,20 @@ def get_trade_history():
     except Exception as e:
          return jsonify({"error": str(e)}), 500
 
+@app.route('/api/logs')
+def get_logs():
+    """Fetch the last 40 lines of bot_log.txt"""
+    try:
+        import os
+        if not os.path.exists('bot_log.txt'):
+             return jsonify({"success": True, "logs": ["[System] Logs initialized."] })
+        with open('bot_log.txt', 'r') as f:
+             lines = f.readlines()[-40:]
+        lines = [l.strip() for l in lines]
+        return jsonify({"success": True, "logs": lines})
+    except Exception as e:
+         return jsonify({"success": False, "logs": [f"Error reading logs: {e}"]})
+
 @app.route('/api/login', methods=['POST'])
 def login():
     """Simple password verification"""

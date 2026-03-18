@@ -128,4 +128,13 @@ class ApiService {
     ).timeout(_fast);
     return r.statusCode == 200;
   }
+
+  Future<List<String>> getLogs() async {
+    final r = await http.get(Uri.parse('$_base/logs')).timeout(_fast);
+    if (r.statusCode == 200) {
+      final data = json.decode(r.body);
+      return List<String>.from(data['logs'] ?? []);
+    }
+    throw Exception('logs failed');
+  }
 }
