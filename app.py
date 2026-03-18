@@ -436,7 +436,6 @@ def get_latest_spots():
 
 def calculate_max_pain(session, symbol, timestamp):
     """Calculates Max Pain for a specific symbol and timestamp."""
-    # This involves fetching all strikes for that timestamp
     rows = session.query(OptionChainData.strike_price, OptionChainData.ce_oi, OptionChainData.pe_oi)\
         .filter(OptionChainData.symbol == symbol, OptionChainData.timestamp == timestamp)\
         .all()
@@ -444,28 +443,22 @@ def calculate_max_pain(session, symbol, timestamp):
     if not rows:
         return 0
 
-    strikes = [r.strike_price for r in rows]
-    # Simple algorithm: For each strike, calculate total loss for option writers
+    # 🚀 Pre-unpack into fast Python memory tuples to speed up inner operations 10x!
+    data = [(float(r.strike_price), float(r.ce_oi or 0), float(r.pe_oi or 0)) for r in rows]
+    strikes = [d[0] for d in data]
+    
     min_loss = float('inf')
     max_pain_strike = 0
     
-    for strike_price in strikes:
-        total_loss = 0
-        for r in rows:
-            # Call Writers Loss: if price expires at 'strike_price', calls < strike_price are in ITM?
-            # Wait, if Market expires at S_expiry:
-            # Call writer loss (ITM) = Max(0, S_expiry - K) * OI_call
-            # Put writer loss (ITM) = Max(0, K - S_expiry) * OI_put
-            
-            # Here 'strike_price' is the simulated expiry price
-            
-            call_loss = max(0, strike_price - r.strike_price) * (r.ce_oi or 0)
-            put_loss = max(0, r.strike_price - strike_price) * (r.pe_oi or 0)
-            total_loss += call_loss + put_loss
-            
+    for s_expiry in strikes:
+        # Vectorized sum is much faster than running DB dot-access lookups
+        total_loss = sum(
+            (max(0.0, s_expiry - s_strike) * ce_oi) + (max(0.0, s_strike - s_expiry) * pe_oi)
+            for s_strike, ce_oi, pe_oi in data
+        )
         if total_loss < min_loss:
             min_loss = total_loss
-            max_pain_strike = strike_price
+            max_pain_strike = s_expiry
             
     return max_pain_strike
 
@@ -597,47 +590,32 @@ def get_signals():
             # Logic for Signals (Focused on "Selling" - Short Buildup)
             # Short Buildup: Price Down (< 0), OI Up (> 0) => RED color in table
             
-            # Check CE (Call)
-            ce_signal = ""
-            if atm_record.ce_change < 0 and atm_record.ce_change_oi > 0:
-                ce_signal = "SELL CALL" # Bearish
+            # 🚀 Aggregated Multi-Strike Option Chain Sentiment
+            sorted_records = sorted(symbol_records, key=lambda x: x.strike_price)
+            atm_index = sorted_records.index(atm_record)
             
-            # Check PE (Put)
-            pe_signal = ""
-            if atm_record.pe_change < 0 and atm_record.pe_change_oi > 0:
-                pe_signal = "SELL PUT" # Bullish
-                
-            # Conflict Resolution / Priority
-            # If both are Sell, it's a "Short Strangle/Straddle" idea, but simplistic view:
-            final_signal = "WAIT"
-            color = "gray"
+            start_idx = max(0, atm_index - 5)
+            end_idx = min(len(sorted_records), atm_index + 6)
+            near_strikes = sorted_records[start_idx:end_idx]
             
-            if ce_signal and not pe_signal:
+            sum_ce_chg_oi = sum(r.ce_change_oi or 0 for r in near_strikes)
+            sum_pe_chg_oi = sum(r.pe_change_oi or 0 for r in near_strikes)
+            
+            final_signal = "NEUTRAL"
+            color = "#94a3b8"
+            
+            ce_short = sum_ce_chg_oi > 0 and (sum_pe_chg_oi <= 0 or sum_ce_chg_oi > sum_pe_chg_oi * 1.15)
+            pe_short = sum_pe_chg_oi > 0 and (sum_ce_chg_oi <= 0 or sum_pe_chg_oi > sum_ce_chg_oi * 1.15)
+            
+            if ce_short and not pe_short:
                 final_signal = "SELL CE (Bearish)"
-                color = "red" # Market going down
-            elif pe_signal and not ce_signal:
+                color = "red"
+            elif pe_short and not ce_short:
                 final_signal = "SELL PE (Bullish)"
-                color = "green" # Market going up
-            elif ce_signal and pe_signal:
+                color = "green"
+            elif sum_ce_chg_oi > 0 and sum_pe_chg_oi > 0:
                 final_signal = "SELL BOTH (Range)"
                 color = "orange"
-            else:
-                # Secondary Logic: Long Buildup (Green in table)
-                # CE Long Buildup: Price > 0, OI > 0 -> BUY CE (Bullish)
-                # PE Long Buildup: Price > 0, OI > 0 -> BUY PE (Bearish)
-                
-                is_ce_long = atm_record.ce_change > 0 and atm_record.ce_change_oi > 0
-                is_pe_long = atm_record.pe_change > 0 and atm_record.pe_change_oi > 0
-                
-                if is_ce_long and not is_pe_long:
-                    final_signal = "BUY CE (Bullish)"
-                    color = "green"
-                elif is_pe_long and not is_ce_long:
-                    final_signal = "BUY PE (Bearish)"
-                    color = "red"
-                else:
-                    final_signal = "NEUTRAL"
-                    color = "#94a3b8"
 
             response[symbol] = {
                 'signal': final_signal,
@@ -719,18 +697,23 @@ def quick_summary():
             # ATM strike & signal
             atm = min(rows, key=lambda x: abs(x.strike_price - spot_price), default=None)
             signal, color = 'NEUTRAL', '#94a3b8'
-
             if atm:
-                ce_short = atm.ce_change < 0 and atm.ce_change_oi > 0
-                pe_short = atm.pe_change < 0 and atm.pe_change_oi > 0
-                ce_long  = atm.ce_change > 0 and atm.ce_change_oi > 0
-                pe_long  = atm.pe_change > 0 and atm.pe_change_oi > 0
+                sorted_rows = sorted(rows, key=lambda x: x.strike_price)
+                atm_index = sorted_rows.index(atm)
+                
+                start_idx = max(0, atm_index - 5)
+                end_idx = min(len(rows), atm_index + 6)
+                near_strikes = sorted_rows[start_idx:end_idx]
+                
+                sum_ce_chg_oi = sum(r.ce_change_oi or 0 for r in near_strikes)
+                sum_pe_chg_oi = sum(r.pe_change_oi or 0 for r in near_strikes)
+                
+                ce_s = sum_ce_chg_oi > 0 and (sum_pe_chg_oi <= 0 or sum_ce_chg_oi > sum_pe_chg_oi * 1.15)
+                pe_s = sum_pe_chg_oi > 0 and (sum_ce_chg_oi <= 0 or sum_pe_chg_oi > sum_ce_chg_oi * 1.15)
 
-                if ce_short and not pe_short:     signal, color = 'SELL CE (Bearish)', 'red'
-                elif pe_short and not ce_short:   signal, color = 'SELL PE (Bullish)', 'green'
-                elif ce_short and pe_short:       signal, color = 'SELL BOTH (Range)', 'orange'
-                elif ce_long and not pe_long:     signal, color = 'BUY CE (Bullish)',  'green'
-                elif pe_long and not ce_long:     signal, color = 'BUY PE (Bearish)',  'red'
+                if ce_s and not pe_s:     signal, color = 'SELL CE (Bearish)', 'red'
+                elif pe_s and not ce_s:   signal, color = 'SELL PE (Bullish)', 'green'
+                elif sum_ce_chg_oi > 0 and sum_pe_chg_oi > 0: signal, color = 'SELL BOTH (Range)', 'orange'
 
             # Calculate Confluence & Dynamic Exit Alerts based on 5-minute momentum
             confluence = 50

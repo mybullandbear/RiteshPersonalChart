@@ -37,18 +37,26 @@ def calculate_signal(session, symbol, timestamp, OptionChainData):
         # Get Expiry Date (Assuming all records in this batch have same expiry, or take from ATM)
         expiry_date = atm_record.expiry_date
         
-        # Logic for Signals (Focused on "Selling" - Short Buildup)
-        # Short Buildup: Price Down (< 0), OI Up (> 0) => RED color in table
+        # 🚀 Aggregated Multi-Strike Option Chain Sentiment
+        # Instead of 1 contract, we sum up nearest 5 strikes above and 5 below SPOT price.
+        sorted_records = sorted(symbol_records, key=lambda x: x.strike_price)
+        atm_index = sorted_records.index(atm_record)
         
-        # Check CE (Call)
+        start_idx = max(0, atm_index - 5)
+        end_idx = min(len(sorted_records), atm_index + 6)
+        near_strikes = sorted_records[start_idx:end_idx]
+        
+        sum_ce_chg_oi = sum(r.ce_change_oi or 0 for r in near_strikes)
+        sum_pe_chg_oi = sum(r.pe_change_oi or 0 for r in near_strikes)
+        
+        # Identify dominant market writing action
         ce_signal = ""
-        if atm_record.ce_change < 0 and atm_record.ce_change_oi > 0:
-            ce_signal = "SELL CALL" # Bearish
-        
-        # Check PE (Put)
+        if sum_ce_chg_oi > 0 and (sum_pe_chg_oi <= 0 or sum_ce_chg_oi > sum_pe_chg_oi * 1.15):
+             ce_signal = "SELL CALL" # Bearish Sentiment
+             
         pe_signal = ""
-        if atm_record.pe_change < 0 and atm_record.pe_change_oi > 0:
-            pe_signal = "SELL PUT" # Bullish
+        if sum_pe_chg_oi > 0 and (sum_ce_chg_oi <= 0 or sum_pe_chg_oi > sum_ce_chg_oi * 1.15):
+             pe_signal = "SELL PUT" # Bullish Sentiment
             
         # Conflict Resolution / Priority
         final_signal = "WAIT"

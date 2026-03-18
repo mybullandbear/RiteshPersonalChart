@@ -709,13 +709,13 @@ class _StatRow extends StatelessWidget {
 
   Widget _chip(String label, String val, Color color) => Expanded(
     child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [kSurface, kSurface2.withOpacity(0.5)],
           begin: Alignment.topLeft, end: Alignment.bottomRight
         ),
-        borderRadius: BorderRadius.circular(18), 
+        borderRadius: BorderRadius.circular(16), 
         border: Border.all(color: color.withOpacity(0.2), width: 1),
         boxShadow: [
           BoxShadow(color: color.withOpacity(0.04), blurRadius: 12, spreadRadius: 0, offset: const Offset(0, 4)),
@@ -723,8 +723,10 @@ class _StatRow extends StatelessWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(label, style: kSubStyle.copyWith(fontSize: 8, color: Colors.white38)),
-        const SizedBox(height: 6),
-        Text(val, style: kMono.copyWith(color: color, fontWeight: FontWeight.w900, fontSize: 18)),
+        const SizedBox(height: 4),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(val, style: kMono.copyWith(color: color, fontWeight: FontWeight.w900, fontSize: 16))),
       ]),
     ),
   );
@@ -1286,74 +1288,138 @@ class _HeaderState extends State<_Header> {
   @override
   void dispose() { _t.cancel(); super.dispose(); }
   @override
-  Widget build(BuildContext context) => Container(
-    height: 70,
-    decoration: BoxDecoration(
-      color: kSurface.withOpacity(0.85),
-      border: const Border(bottom: BorderSide(color: Colors.white10, width: 0.5)),
-    ),
-    padding: const EdgeInsets.symmetric(horizontal: 24),
-    child: Row(children: [
-      Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(width: 8, height: 8, decoration: const BoxDecoration(color: kAccent, shape: BoxShape.circle)),
-              const SizedBox(width: 8),
-              Text('QUANT TERMINAL V1', style: kSubStyle.copyWith(color: kAccent.withOpacity(0.8), letterSpacing: 2)),
-            ],
-          ),
-          const Text('NSE OPTION CHAIN', style: kHeaderStyle),
-        ],
-      ),
-      const Spacer(),
-      if (widget.dates.isNotEmpty)
-        Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: kSurface2,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.05)),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: widget.selectedDate, dropdownColor: kSurface,
-              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1),
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: kGrey),
-              items: widget.dates.map((d) =>
-                DropdownMenuItem(value: d, child: Text(d))).toList(),
-              onChanged: (v) { if (v != null) widget.onDateChanged(v); })),
+  Widget build(BuildContext context) {
+    final isSmall = MediaQuery.of(context).size.width < 700;
+    
+    if (isSmall) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: kSurface.withOpacity(0.85),
+          border: const Border(bottom: BorderSide(color: Colors.white10, width: 0.5)),
         ),
-      const SizedBox(width: 25),
-      // Clock & Sync Status
-      Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(DateFormat('HH:mm:ss').format(_now),
-               style: kMono.copyWith(fontSize: 18, color: Colors.white, letterSpacing: 1)),
-          Row(
-            children: [
-              const Text('SYSTEM LIVE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: kGreen, letterSpacing: 1)),
-              const SizedBox(width: 6),
-              Container(
-                width: 6, height: 6, 
-                decoration: BoxDecoration(
-                  color: kGreen, shape: BoxShape.circle,
-                  boxShadow: [BoxShadow(color: kGreen.withOpacity(0.5), blurRadius: 4, spreadRadius: 1)]
-                )
-              ),
-            ],
-          ),
-        ],
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Container(width: 8, height: 8, decoration: const BoxDecoration(color: kAccent, shape: BoxShape.circle)),
+                      const SizedBox(width: 8),
+                      Text('QUANT TERMINAL', style: kSubStyle.copyWith(color: kAccent.withOpacity(0.8), letterSpacing: 1, fontSize: 8)),
+                    ]),
+                    const Text('NSE OPTION CHAIN', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white)),
+                  ],
+                ),
+                _RefreshButton(onPressed: widget.onRefresh, refreshing: widget.refreshing),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (widget.dates.isNotEmpty)
+                  Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: kSurface2, borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white.withOpacity(0.05)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: widget.selectedDate, dropdownColor: kSurface,
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                        items: widget.dates.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                        onChanged: (v) { if (v != null) widget.onDateChanged(v); })),
+                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(DateFormat('HH:mm').format(_now), style: kMono.copyWith(fontSize: 14, color: Colors.white)),
+                    const Text('SYSTEM LIVE', style: TextStyle(fontSize: 8, color: kGreen, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      height: 70,
+      decoration: BoxDecoration(
+        color: kSurface.withOpacity(0.85),
+        border: const Border(bottom: BorderSide(color: Colors.white10, width: 0.5)),
       ),
-      const SizedBox(width: 25),
-      _RefreshButton(onPressed: widget.onRefresh, refreshing: widget.refreshing),
-    ]),
-  );
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(children: [
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(width: 8, height: 8, decoration: const BoxDecoration(color: kAccent, shape: BoxShape.circle)),
+                const SizedBox(width: 8),
+                Text('QUANT TERMINAL V1', style: kSubStyle.copyWith(color: kAccent.withOpacity(0.8), letterSpacing: 2)),
+              ],
+            ),
+            const Text('NSE OPTION CHAIN', style: kHeaderStyle),
+          ],
+        ),
+        const Spacer(),
+        if (widget.dates.isNotEmpty)
+          Container(
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: kSurface2,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withOpacity(0.05)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: widget.selectedDate, dropdownColor: kSurface,
+                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1),
+                icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: kGrey),
+                items: widget.dates.map((d) =>
+                  DropdownMenuItem(value: d, child: Text(d))).toList(),
+                onChanged: (v) { if (v != null) widget.onDateChanged(v); })),
+          ),
+        const SizedBox(width: 25),
+        // Clock & Sync Status
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(DateFormat('HH:mm:ss').format(_now),
+                 style: kMono.copyWith(fontSize: 18, color: Colors.white, letterSpacing: 1)),
+            Row(
+              children: [
+                const Text('SYSTEM LIVE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: kGreen, letterSpacing: 1)),
+                const SizedBox(width: 6),
+                Container(
+                  width: 6, height: 6, 
+                  decoration: BoxDecoration(
+                    color: kGreen, shape: BoxShape.circle,
+                    boxShadow: [BoxShadow(color: kGreen.withOpacity(0.5), blurRadius: 4, spreadRadius: 1)]
+                  )
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(width: 25),
+        _RefreshButton(onPressed: widget.onRefresh, refreshing: widget.refreshing),
+      ]),
+    );
+  }
 }
 
 class _RefreshButton extends StatelessWidget {
@@ -1489,11 +1555,129 @@ class _ExpandableOptionChainState extends State<_ExpandableOptionChain> {
                  child: Text(_error!, style: const TextStyle(color: kRed))),
             if (!_loading && _error == null && _data.isNotEmpty)
                ConstrainedBox(
-                 constraints: const BoxConstraints(maxHeight: 400),
-                 child: _OptionChainTable(optionData: _data, spotPrice: widget.spotPrice, accent: widget.accent),
+                 constraints: const BoxConstraints(maxHeight: 450),
+                 child: LayoutBuilder(builder: (context, constraints) {
+                   if (MediaQuery.of(context).size.width < 600) {
+                     return _OptionChainMobileList(optionData: _data, spotPrice: widget.spotPrice, accent: widget.accent);
+                   }
+                   return _OptionChainTable(optionData: _data, spotPrice: widget.spotPrice, accent: widget.accent);
+                 }),
                ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─── Option Chain Mobile Card-style List ──────────────────────────
+class _OptionChainMobileList extends StatelessWidget {
+  final List<OptionData> optionData;
+  final double? spotPrice;
+  final Color accent;
+
+  const _OptionChainMobileList({
+    required this.optionData,
+    required this.spotPrice,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      itemCount: optionData.length,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      itemBuilder: (context, i) {
+        final r = optionData[i];
+        final bool isAtm = spotPrice != null && (r.strikePrice - spotPrice!).abs() < 51;
+        return _OcMobileCard(data: r, isAtm: isAtm, accent: accent);
+      },
+    );
+  }
+}
+
+class _OcMobileCard extends StatelessWidget {
+  final OptionData data;
+  final bool isAtm;
+  final Color accent;
+
+  const _OcMobileCard({required this.data, required this.isAtm, required this.accent});
+
+  Color _c(num? v) => (v == null || v == 0) ? Colors.white54 : v > 0 ? kGreen : kRed;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = NumberFormat.compact();
+    final lf = NumberFormat('#,##0.00');
+
+    return Card(
+      color: isAtm ? accent.withOpacity(0.08) : kSurface2.withOpacity(0.6),
+      margin: const EdgeInsets.only(bottom: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: isAtm ? accent.withOpacity(0.4) : Colors.white.withOpacity(0.05)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            // Center Strike Label
+            Text(
+              NumberFormat('#,###').format(data.strikePrice),
+              style: TextStyle(
+                color: isAtm ? accent : Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+              ),
+            ),
+            const Divider(color: Colors.white10),
+            
+            // Calls & Puts Columns
+            Row(
+              children: [
+                // Call Stats (Left)
+                Expanded(
+                  child: Column(
+                    children: [
+                      const Text('CALLS (CE)', style: TextStyle(color: kGreen, fontSize: 9, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      _row('LTP', lf.format(data.ce.lastPrice ?? 0), _c(data.ce.change)),
+                      _row('OI', c.format(data.ce.oi ?? 0), Colors.white60),
+                      _row('Δ OI', c.format(data.ce.changeOi ?? 0), _c(data.ce.changeOi)),
+                    ],
+                  ),
+                ),
+                Container(width: 1, height: 50, color: Colors.white10),
+                
+                // Put Stats (Right)
+                Expanded(
+                  child: Column(
+                    children: [
+                      const Text('PUTS (PE)', style: TextStyle(color: kRed, fontSize: 9, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      _row('LTP', lf.format(data.pe.lastPrice ?? 0), _c(data.pe.change)),
+                      _row('OI', c.format(data.pe.oi ?? 0), Colors.white60),
+                      _row('Δ OI', c.format(data.pe.changeOi ?? 0), _c(data.pe.changeOi)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _row(String label, String val, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white24, fontSize: 9)),
+          Text(val, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+        ],
       ),
     );
   }
