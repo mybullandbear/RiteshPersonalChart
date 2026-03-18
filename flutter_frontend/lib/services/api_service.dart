@@ -111,4 +111,12 @@ class ApiService {
     ).timeout(_fast);
     return r.statusCode == 200;
   }
+
+  Future<List<dynamic>> getTradeHistory() async {
+    final r = await http.get(Uri.parse('$_base/trade_history')).timeout(_fast);
+    if (r.statusCode == 200) {
+      return json.decode(r.body) as List<dynamic>;
+    }
+    throw Exception('trade_history failed');
+  }
 }

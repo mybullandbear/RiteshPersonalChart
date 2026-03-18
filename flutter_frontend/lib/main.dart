@@ -318,6 +318,23 @@ class _TradingDashboardState extends State<TradingDashboard> {
                         )
                       ),
                       
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.blueAccent, width: 1.5),
+                            padding: const EdgeInsets.all(16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: () {
+                             Navigator.pop(context); // Close current hub
+                             _showTradeHistory(context); // Open history
+                          },
+                          icon: const Icon(Icons.history, color: Colors.blueAccent),
+                          label: const Text('VIEW TRADE HISTORY LEDGER', style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.w900)),
+                        ),
+                      ),
                       const SizedBox(height: 24),
                       const Text('ACTIVE POSITIONS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white54, letterSpacing: 1.5)),
                       const SizedBox(height: 12),
@@ -424,6 +441,81 @@ class _TradingDashboardState extends State<TradingDashboard> {
                   )
                 );
               }
+            );
+          }
+        );
+      }
+    );
+  }
+
+  void _showTradeHistory(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: kBg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) {
+        return FutureBuilder<List<dynamic>>(
+          future: _api.getTradeHistory(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const SizedBox(height: 400, child: Center(child: CircularProgressIndicator()));
+            }
+            if (snapshot.hasError) {
+              return SizedBox(height: 300, child: Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: kRed))));
+            }
+            final list = snapshot.data ?? [];
+            if (list.isEmpty) {
+              return const SizedBox(height: 300, child: Center(child: Text('No trades logged today', style: TextStyle(color: Colors.white54, fontSize: 16))));
+            }
+            
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.8,
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    const Text('TRADE HISTORY LEDGER', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
+                    IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.pop(context))
+                  ]),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: list.length,
+                      itemBuilder: (context, idx) {
+                        final t = list[list.length - 1 - idx]; // Reverse order
+                        final double profit = (t['profit'] ?? 0).toDouble();
+                        final String time = t['exit_time']?.split(' ')?.last ?? '';
+                        final String symbol = t['symbol'] ?? '';
+                        
+                        return Card(
+                          color: kSurface,
+                          margin: const EdgeInsets.only(bottom: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: profit >= 0 ? kGreen.withOpacity(0.3) : kRed.withOpacity(0.3))),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                                Text('${symbol.replaceAll('PAPER_', '')}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                                Text(profit >= 0 ? '+₹${profit.toStringAsFixed(2)}' : '-₹${profit.abs().toStringAsFixed(2)}', style: TextStyle(color: profit >= 0 ? kGreen : kRed, fontWeight: FontWeight.w900, fontSize: 18))
+                              ]),
+                              const SizedBox(height: 8),
+                              Text('${t['type']} ${t['strike']} • Qty ${t['quantity']}', style: const TextStyle(color: Colors.white70)),
+                              const SizedBox(height: 6),
+                              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                                Text('Entry ₹${t['entry_price']} → Exit ₹${t['exit_price']}', style: const TextStyle(fontSize: 12, color: Colors.white54)),
+                                Text('Time: $time', style: const TextStyle(fontSize: 12, color: Colors.white38))
+                              ]),
+                              const Divider(color: Colors.white10),
+                              Text('💡 Reason: ${t['exit_reason'] ?? 'Manual'}', style: TextStyle(color: profit >= 0 ? kGreen.withOpacity(0.8) : kAccent, fontSize: 12, fontStyle: FontStyle.italic))
+                            ])
+                          )
+                        );
+                      }
+                    )
+                  )
+                ]
+              )
             );
           }
         );
