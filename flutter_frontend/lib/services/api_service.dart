@@ -119,4 +119,13 @@ class ApiService {
     }
     throw Exception('trade_history failed');
   }
+
+  Future<bool> login(String password) async {
+    final r = await http.post(
+      Uri.parse('$_base/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'password': password}),
+    ).timeout(_fast);
+    return r.statusCode == 200;
+  }
 }

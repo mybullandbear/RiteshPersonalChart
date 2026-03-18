@@ -100,11 +100,12 @@ class _TradingDashboardState extends State<TradingDashboard> {
   bool _refreshing = false;
   DateTime _lastUpdated = DateTime.now();
   Timer? _streamTimer;
+  bool _isAuthenticated = false;
 
   @override
   void initState() {
     super.initState();
-    _boot();
+    // _boot() will run after login success
     // Real-Time Livestream (Auto-updating in background)
     _streamTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!_initialLoading && _selectedDate != null) {
@@ -201,6 +202,12 @@ class _TradingDashboardState extends State<TradingDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_isAuthenticated) {
+       return _LoginScreen(onSuccess: () {
+           setState(() { _isAuthenticated = true; });
+           _boot();
+       });
+    }
     return Scaffold(
       backgroundColor: kBg,
       body: Stack(
@@ -1772,5 +1779,91 @@ class _OcMobileCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _LoginScreen extends StatefulWidget {
+  final VoidCallback onSuccess;
+  const _LoginScreen({required this.onSuccess});
+
+  @override
+  State<_LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<_LoginScreen> {
+  final _passController = TextEditingController();
+  bool _loading = false;
+  String? _error;
+
+  void _submit() async {
+    if (_passController.text.isEmpty) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      final success = await ApiService().login(_passController.text);
+      if (success) {
+         widget.onSuccess();
+      } else {
+         setState(() { _error = "Incorrect Password"; _loading = false; });
+      }
+    } catch (e) {
+      setState(() { _error = "Connection Error"; _loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+     return Scaffold(
+       backgroundColor: kBg,
+       body: Center(
+         child: Container(
+            width: 360,
+            padding: const EdgeInsets.all(32),
+            decoration: kGlassDecoration,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+               const Icon(Icons.lock_outline, color: kAccent, size: 48),
+               const SizedBox(height: 16),
+               const Text('NSE OPTION CHAIN', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
+               const SizedBox(height: 4),
+               const Text('ENTER PASSWORD TO ACCESS', style: TextStyle(fontSize: 11, color: kGrey, letterSpacing: 1)),
+               const SizedBox(height: 32),
+               TextField(
+                  controller: _passController,
+                  obscureText: true,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                     hintText: 'Password',
+                     hintStyle: const TextStyle(color: Colors.white24, fontSize: 13),
+                     filled: true,
+                     fillColor: kSurface,
+                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                  onSubmitted: (_) => _submit(),
+               ),
+               if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(_error!, style: const TextStyle(color: kRed, fontSize: 13))
+               ],
+               const SizedBox(height: 24),
+               SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                     style: ElevatedButton.styleFrom(
+                        backgroundColor: kAccent,
+                        foregroundColor: kBg,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.all(16)
+                     ),
+                     onPressed: _loading ? null : _submit,
+                     child: _loading 
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: kBg)) 
+                        : const Text('UNLOCK DASHBOARD', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                  )
+               )
+            ])
+         )
+       )
+     );
   }
 }

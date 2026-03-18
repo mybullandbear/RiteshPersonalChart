@@ -841,6 +841,28 @@ def get_trade_history():
     except Exception as e:
          return jsonify({"error": str(e)}), 500
 
+@app.route('/api/login', methods=['POST'])
+def login():
+    """Simple password verification"""
+    try:
+        data = request.json
+        password = data.get('password')
+        
+        # Load from config
+        app_pass = "admin"
+        try:
+            import os
+            if os.path.exists("config.json"):
+                with open("config.json", 'r') as f:
+                    app_pass = json.load(f).get("app_password", "admin")
+        except: pass
+
+        if password == app_pass:
+             return jsonify({"success": True})
+        return jsonify({"success": False, "error": "Incorrect Password"}), 401
+    except Exception as e:
+         return jsonify({"success": False, "error": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
 
