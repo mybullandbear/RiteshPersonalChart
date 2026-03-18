@@ -6,7 +6,7 @@
     "zerodha_access_token": "VhkEJtpuTV6A86LPq6rSFjZ6EZ9oXmVZ",
     "trading_enabled": false,
     "quantity": 75,
-    "NIFTY_LOT": 25,
-    "BANKNIFTY_LOT": 15,
+    "NIFTY_LOT": 65,
+    "BANKNIFTY_LOT": 30,
     "STOP_LOSS": 1500
 }

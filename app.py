@@ -241,7 +241,7 @@ def execute_trade_endpoint():
         
         was_enabled = trader.get_trading_status()
         if not was_enabled: trader.set_trading_status(True)
-        trader.execute_trade(signal_data, symbol, "AUTO")
+        trader.execute_trade(signal_data, symbol, "AUTO", reason="Manual 1-Click Trigger")
         if not was_enabled: trader.set_trading_status(False) # Restore
             
         return jsonify({"success": True, "message": f"Execution request sent for {symbol} {action} @ {option_price}"})
@@ -816,7 +816,7 @@ def quick_summary():
                 if is_auto and not pos and signal != 'NEUTRAL' and signal != 'No Data' and signal != 'WAIT':
                      # Execute automatically if confluence is high
                      if confluence >= 70:
-                         trader.execute_trade(signal_data, sym, "AUTO")
+                          trader.execute_trade(signal_data, sym, "AUTO", reason=f"Aggregated Signal ({signal}) Confluence {confluence}%")
                          
             except Exception as e:
                 print("Error in AutoTrade/PnL calculation:", e)
@@ -828,6 +828,18 @@ def quick_summary():
     finally:
         session.close()
 
+
+@app.route('/api/trade_history')
+def get_trade_history():
+    """Returns contents of trade_history.json"""
+    try:
+        import os
+        if os.path.exists("trade_history.json"):
+             with open("trade_history.json", 'r') as f:
+                 return jsonify(json.load(f))
+        return jsonify([])
+    except Exception as e:
+         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

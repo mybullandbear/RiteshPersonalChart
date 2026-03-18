@@ -43,13 +43,12 @@ class PaperTrader:
         state["trading_enabled"] = enabled
         self.save_trading_state(state)
 
-    def execute_trade(self, signal_data, symbol, expiry_date):
+    def execute_trade(self, signal_data, symbol, expiry_date, reason="Auto Signal"):
         """Paper Execution Logic."""
         state = self.load_trading_state()
         
         # Check Active Position
         if state.get("positions", {}).get(symbol):
-            # Already have a position, don't double up
             return
 
         signal = signal_data.get('signal', '')
@@ -73,13 +72,13 @@ class PaperTrader:
         option_type = "CE" if action == "SELL_CE" else "PE"
         
         # 🚀 Dynamic Sizing and Risk Values
-        nifty_lot = 25
-        banknifty_lot = 15
+        nifty_lot = 65
+        banknifty_lot = 30
         try:
             with open("config.json", 'r') as f:
                 c = json.load(f)
-                nifty_lot = c.get("NIFTY_LOT", 25)
-                banknifty_lot = c.get("BANKNIFTY_LOT", 15)
+                nifty_lot = c.get("NIFTY_LOT", 65)
+                banknifty_lot = c.get("BANKNIFTY_LOT", 30)
         except: pass
         
         quantity = nifty_lot if symbol == "NIFTY" else banknifty_lot
@@ -94,7 +93,8 @@ class PaperTrader:
             "quantity": quantity,
             "highest_profit": 0,
             "current_profit": 0,
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "entry_reason": reason
         }
         self.save_trading_state(state)
         print(f"[{symbol}] Paper Entry: SELL {option_type} {atm_strike} @ {option_price}")
@@ -129,20 +129,57 @@ class PaperTrader:
         # 1. Hard Stop-Loss Guard (Loss limit hit)
         if current_profit <= -abs(stop_loss_limit):
             print(f"[{symbol}] HARD STOP LOSS HIT (₹{current_profit:,.2f})! Exiting Position...")
-            self.exit_position(symbol)
+            self.exit_position(symbol, reason=f"Hard Stop-Loss (₹{stop_loss_limit})")
             return
 
         # 2. Existing Trailing SL 
         if highest_profit >= 3000 and current_profit <= 2000:
             print(f"[{symbol}] Trailing SL Hit in Paper Trade! Exiting...")
-            self.exit_position(symbol)
+            self.exit_position(symbol, reason="Trailing SL (Peak ₹3000 -> Pullback ₹2000)")
             
-    def exit_position(self, symbol):
+    def log_trade_history(self, pos, exit_price, exit_reason):
+        """Saves trade to trade_history.json"""
+        history_file = "trade_history.json"
+        history = []
+        if os.path.exists(history_file):
+            try:
+                with open(history_file, 'r') as f: history = json.load(f)
+            except: pass
+            
+        trade_entry = {
+            "symbol": pos.get("trading_symbol", ""),
+            "type": pos.get("type", ""),
+            "strike": pos.get("strike", 0),
+            "quantity": pos.get("quantity", 0),
+            "entry_price": pos.get("entry_price", 0),
+            "exit_price": round(exit_price, 2),
+            "profit": round((pos.get("entry_price", 0) - exit_price) * pos.get("quantity", 0), 2),
+            "highest_profit": pos.get("highest_profit", 0),
+            "entry_time": pos.get("timestamp", ""),
+            "exit_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "entry_reason": pos.get("entry_reason", "Auto Signal"),
+            "exit_reason": exit_reason
+        }
+        history.append(trade_entry)
+        try:
+            with open(history_file, 'w') as f: json.dump(history, f, indent=4)
+        except: pass
+
+    def exit_position(self, symbol, reason="Manual Close"):
         """Exits the paper position."""
         state = self.load_trading_state()
-        if state.get("positions") and symbol in state["positions"]:
+        pos = state.get("positions", {}).get(symbol)
+        if pos:
+            try:
+                # current_profit = (entry - current) * qty  =>  current = entry - (profit / qty)
+                current_ltp = pos.get("entry_price", 0) - (pos.get("current_profit", 0) / pos.get("quantity", 1))
+                self.log_trade_history(pos, current_ltp, reason)
+            except: pass
+            
             state["positions"][symbol] = None
             self.save_trading_state(state)
-            print(f"[{symbol}] Paper Position Closed.")
+            print(f"[{symbol}] Paper Position Closed: {reason}")
+            
+
 
 trader = PaperTrader()
