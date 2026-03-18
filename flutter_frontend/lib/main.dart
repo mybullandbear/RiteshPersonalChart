@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:js' as js;
+import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -105,6 +106,15 @@ class _TradingDashboardState extends State<TradingDashboard> {
   @override
   void initState() {
     super.initState();
+    
+    // 🔒 Persistent Login Check
+    try {
+      final saved = html.window.localStorage['dashboard_auth'];
+      if (saved == 'AUTHORIZED_OK') {
+         _isAuthenticated = true;
+         _boot();
+      }
+    } catch(e) {}
     // _boot() will run after login success
     // Real-Time Livestream (Auto-updating in background)
     _streamTimer = Timer.periodic(const Duration(seconds: 4), (_) {
@@ -1801,6 +1811,9 @@ class _LoginScreenState extends State<_LoginScreen> {
     try {
       final success = await ApiService().login(_passController.text);
       if (success) {
+         try {
+           html.window.localStorage['dashboard_auth'] = 'AUTHORIZED_OK';
+         } catch(e) {}
          widget.onSuccess();
       } else {
          setState(() { _error = "Incorrect Password"; _loading = false; });
