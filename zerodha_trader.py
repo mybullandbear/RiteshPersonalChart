@@ -71,7 +71,18 @@ class PaperTrader:
             return
 
         option_type = "CE" if action == "SELL_CE" else "PE"
-        quantity = 65 if symbol == "NIFTY" else 30
+        
+        # 🚀 Dynamic Sizing and Risk Values
+        nifty_lot = 25
+        banknifty_lot = 15
+        try:
+            with open("config.json", 'r') as f:
+                c = json.load(f)
+                nifty_lot = c.get("NIFTY_LOT", 25)
+                banknifty_lot = c.get("BANKNIFTY_LOT", 15)
+        except: pass
+        
+        quantity = nifty_lot if symbol == "NIFTY" else banknifty_lot
         
         # Record paper trade
         if "positions" not in state: state["positions"] = {}
@@ -108,7 +119,20 @@ class PaperTrader:
         pos["highest_profit"] = highest_profit
         self.save_trading_state(state)
         
-        # Simple TS/SL 
+        # 🚀 Risk Management Overrides
+        stop_loss_limit = 1500 # Absolute value
+        try:
+            with open("config.json", 'r') as f:
+                stop_loss_limit = json.load(f).get("STOP_LOSS", 1500)
+        except: pass
+
+        # 1. Hard Stop-Loss Guard (Loss limit hit)
+        if current_profit <= -abs(stop_loss_limit):
+            print(f"[{symbol}] HARD STOP LOSS HIT (₹{current_profit:,.2f})! Exiting Position...")
+            self.exit_position(symbol)
+            return
+
+        # 2. Existing Trailing SL 
         if highest_profit >= 3000 and current_profit <= 2000:
             print(f"[{symbol}] Trailing SL Hit in Paper Trade! Exiting...")
             self.exit_position(symbol)
