@@ -103,6 +103,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
   Timer? _streamTimer;
   bool _isAuthenticated = false;
   int _activeTabIndex = 0; // 0 = Market Pulse, 1 = Index Analytics
+  bool _phase1Loading = false;
 
   @override
   void initState() {
@@ -157,10 +158,11 @@ class _TradingDashboardState extends State<TradingDashboard> {
 
   // ── Phase 1: Quick summary (< 1 s) ───────────────────────
   Future<void> _phase1() async {
+    if (_phase1Loading) return;
+    _phase1Loading = true;
     try {
       final s = await _api.getQuickSummary(_selectedDate);
       
-      // Check for signal shifts for audio Alert
       for (final sym in s.keys) {
          final newSig = s[sym]?.signal ?? '';
          final oldSig = _summary[sym]?.signal ?? '';
@@ -175,12 +177,20 @@ class _TradingDashboardState extends State<TradingDashboard> {
         _summary = s;
         _initialLoading = false;
         _refreshing = false;
+        _error = null; // Clear error on successful update
         _lastUpdated = DateTime.now();
       });
     } catch (e) {
       if (mounted) {
-        setState(() { _initialLoading = false; _error = 'Error: $e'; });
+        // 🤫 Silent fail for periodic updates so it doesn't break the UI with error screens
+        if (_summary.isEmpty) {
+          setState(() { _initialLoading = false; _error = 'Error: $e'; });
+        } else {
+          print("Stream Update Error (ignoring on loaded UI): $e");
+        }
       }
+    } finally {
+      _phase1Loading = false;
     }
   }
 
