@@ -102,6 +102,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
   DateTime _lastUpdated = DateTime.now();
   Timer? _streamTimer;
   bool _isAuthenticated = false;
+  int _activeTabIndex = 0; // 0 = Market Pulse, 1 = Index Analytics
 
   @override
   void initState() {
@@ -238,6 +239,8 @@ class _TradingDashboardState extends State<TradingDashboard> {
             _Header(
               dates: _dates, selectedDate: _selectedDate,
               lastUpdated: _lastUpdated, refreshing: _refreshing,
+              activeTabIndex: _activeTabIndex,
+              onTabChanged: (i) => setState(() => _activeTabIndex = i),
               onDateChanged: _onDateChanged, onRefresh: () { _refreshing = true; _phase1(); _phase2and3(); },
             ),
             if (!_initialLoading && _error == null)
@@ -546,6 +549,80 @@ class _TradingDashboardState extends State<TradingDashboard> {
     if (_initialLoading) return const Center(child: _Spinner(label: 'Connecting to backend…'));
     if (_error != null) return _ErrorView(message: _error!, onRetry: _boot);
     
+    return _activeTabIndex == 0 ? _buildPulseTier() : _buildAnalyticsTier();
+  }
+
+  Widget _buildPulseTier() {
+    // 🧮 Calculate Average Market Sentiment Score (0 to 100 based on PCR 0.5 -> 1.5 interval fallback ranges)
+    double nPcr = _summary['NIFTY']?.pcr ?? 1.0;
+    double bPcr = _summary['BANKNIFTY']?.pcr ?? 1.0;
+    double fPcr = _summary['FINNIFTY']?.pcr ?? 1.0;
+    double avgPcr = (nPcr + bPcr + fPcr) / 3;
+    double score = (((avgPcr - 0.5) / 1.0) * 100).clamp(0.0, 100.0);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: kSurface.withOpacity(0.4),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.04)),
+            ),
+            child: Column(
+              children: [
+                const Text('📊 AGGREGATED MARKET SENTIMENT', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                const SizedBox(height: 25),
+                _SpeedometerGauge(score: score, label: 'AVG PCR: ${avgPcr.toStringAsFixed(2)}'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          _buildBarriersSection(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBarriersSection(BuildContext context) {
+    final bool isSmall = MediaQuery.of(context).size.width < 900;
+    final widgets = <Widget>[];
+
+    for (final sym in ['NIFTY', 'BANKNIFTY', 'FINNIFTY']) {
+      final list = _oiStats[sym] ?? [];
+      double spot = _summary[sym]?.spot ?? 0;
+      double res = 0; double sup = 0;
+      double maxC = 0; double maxP = 0;
+
+      for (final oi in list) {
+        if (oi.ceOi > maxC) { maxC = oi.ceOi; res = oi.strikePrice; }
+        if (oi.peOi > maxP) { maxP = oi.peOi; sup = oi.strikePrice; }
+      }
+
+      if (spot > 0 && res > 0 && sup > 0) {
+        widgets.add(
+          _BarrierSlider(
+            symbol: sym, spot: spot, support: sup, resistance: res,
+            accent: sym == 'NIFTY' ? kNifty : (sym == 'BANKNIFTY' ? kBank : Colors.purpleAccent),
+          )
+        );
+      }
+    }
+
+    if (widgets.isEmpty) {
+      return const Center(child: Text("🧱 Loading Barrier Support/Resistance Data...", style: TextStyle(color: Colors.white24, fontSize: 12)));
+    }
+
+    if (isSmall) {
+      return Column(children: widgets.map((w) => Padding(padding: const EdgeInsets.only(bottom: 12), child: w)).toList());
+    }
+
+    return Row(children: widgets.map((w) => Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: w))).toList());
+  }
+
+  Widget _buildAnalyticsTier() {
     return LayoutBuilder(builder: (context, constraints) {
       if (constraints.maxWidth < 900) {
         // Mobile / Tablet Stacked View
@@ -1421,13 +1498,49 @@ class _Header extends StatefulWidget {
   final String? selectedDate;
   final DateTime lastUpdated;
   final bool refreshing;
+  final int activeTabIndex;
+  final ValueChanged<int> onTabChanged;
   final ValueChanged<String> onDateChanged;
   final VoidCallback onRefresh;
-  const _Header({required this.dates, required this.selectedDate,
+
+  const _Header({
+    required this.dates, required this.selectedDate,
     required this.lastUpdated, required this.refreshing,
-    required this.onDateChanged, required this.onRefresh});
+    required this.activeTabIndex, required this.onTabChanged,
+    required this.onDateChanged, required this.onRefresh
+  });
+
   @override
   State<_Header> createState() => _HeaderState();
+}
+
+class _TabButton extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+  const _TabButton({required this.label, required this.active, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: active ? kAccent : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: active ? Colors.black : Colors.white,
+            fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.8
+          )
+        ),
+      ),
+    );
+  }
 }
 
 class _HeaderState extends State<_Header> {
@@ -1450,7 +1563,10 @@ class _HeaderState extends State<_Header> {
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            _buildTabSwitcher(),
+            const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1523,6 +1639,8 @@ class _HeaderState extends State<_Header> {
             const Text('NSE OPTION CHAIN', style: kHeaderStyle),
           ],
         ),
+        const SizedBox(width: 40),
+        _buildTabSwitcher(),
         const Spacer(),
         if (widget.dates.isNotEmpty)
           Container(
@@ -2008,6 +2126,148 @@ class _LogsPanelState extends State<_LogsPanel> {
             )
         ],
       ),
+    );
+  }
+}
+
+class _SpeedometerGauge extends StatelessWidget {
+  final double score; // 0 to 100
+  final String label;
+  const _SpeedometerGauge({required this.score, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SizedBox(
+          width: 180, height: 100,
+          child: CustomPaint(
+            painter: _GaugePainter(score: score),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white10),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.8),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GaugePainter extends CustomPainter {
+  final double score;
+  _GaugePainter({required this.score});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height);
+    final radius = size.width / 2 - 8;
+    
+    final Paint bgPaint = Paint()
+      ..color = Colors.white.withOpacity(0.05)
+      ..strokeWidth = 12
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final Paint fillPaint = Paint()
+      ..shader = const LinearGradient(
+        colors: [kRed, Colors.amber, kGreen],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      ).createShader(Rect.fromCircle(center: center, radius: radius))
+      ..strokeWidth = 14
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    // Draw background track
+    canvas.drawArc(Rect.fromCircle(center: center, radius: radius), pi, pi, false, bgPaint);
+
+    // Draw active track
+    double sweepAngle = (score / 100) * pi;
+    if (sweepAngle > 0) {
+      canvas.drawArc(Rect.fromCircle(center: center, radius: radius), pi, sweepAngle, false, fillPaint);
+    }
+
+    // Draw needle
+    final needlePaint = Paint()..color = Colors.white..strokeWidth = 3.5..strokeCap = StrokeCap.round;
+    double needleAngle = pi + sweepAngle;
+    double needleLen = radius - 4;
+    Offset endOffset = Offset(center.dx + needleLen * cos(needleAngle), center.dy + needleLen * sin(needleAngle));
+    
+    canvas.drawLine(center, endOffset, needlePaint);
+    canvas.drawCircle(center, 7, Paint()..color = kAccent);
+    canvas.drawCircle(center, 4, Paint()..color = Colors.black);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class _BarrierSlider extends StatelessWidget {
+  final String symbol;
+  final double spot;
+  final double support;
+  final double resistance;
+  final Color accent;
+
+  const _BarrierSlider({
+    required this.symbol, required this.spot,
+    required this.support, required this.resistance,
+    required this.accent
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    double progress = 0.5;
+    if (resistance > support) {
+      progress = ((spot - support) / (resistance - support)).clamp(0.0, 1.0);
+    }
+
+    return Container(
+       padding: const EdgeInsets.all(16),
+       decoration: BoxDecoration(
+          color: kSurface.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.03)),
+       ),
+       child: Column(
+          children: [
+             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                 Text(symbol, style: TextStyle(color: accent, fontWeight: FontWeight.bold, fontSize: 13)),
+                 Text('Spot: ${spot.toStringAsFixed(1)}', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+             ]),
+             const SizedBox(height: 14),
+             Stack(
+               children: [
+                  Container(height: 8, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4))),
+                  FractionallySizedBox(
+                     widthFactor: progress,
+                     child: Container(height: 8, decoration: BoxDecoration(color: accent.withOpacity(0.4), borderRadius: BorderRadius.circular(4))),
+                  ),
+               ]
+             ),
+             const SizedBox(height: 10),
+             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('SUPPORT', style: TextStyle(color: Colors.white38, fontSize: 8, letterSpacing: 0.5)),
+                    Text(support.toInt().toString(), style: const TextStyle(color: kGreen, fontSize: 12, fontWeight: FontWeight.w900)),
+                 ]),
+                 Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    const Text('RESISTANCE', style: TextStyle(color: Colors.white38, fontSize: 8, letterSpacing: 0.5)),
+                    Text(resistance.toInt().toString(), style: const TextStyle(color: kRed, fontSize: 12, fontWeight: FontWeight.w900)),
+                 ]),
+             ]),
+          ]
+       )
     );
   }
 }
