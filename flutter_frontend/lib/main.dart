@@ -105,6 +105,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
   bool _isAuthenticated = false;
   int _activeTabIndex = 0; // 0 = Market Pulse, 1 = Index Analytics
   bool _phase1Loading = false;
+  Map<String, dynamic>? _mtfTrend;
 
   @override
   void initState() {
@@ -195,12 +196,15 @@ class _TradingDashboardState extends State<TradingDashboard> {
     }
   }
 
-  // ── Phase 2: Charts (background) ────
   void _phase2and3() {
     final date = _selectedDate;
     if (date == null) return;
 
-    for (final sym in ['NIFTY', 'BANKNIFTY']) {
+    _api.getMtfTrend().then((val) {
+      if (mounted) setState(() => _mtfTrend = val);
+    }).catchError((_) {});
+
+    for (final sym in ['NIFTY', 'BANKNIFTY', 'FINNIFTY']) {
       setState(() { _oiLoading[sym] = true; });
 
       // OI charts (we compute Max Pain now since you want visuals!)
@@ -565,6 +569,15 @@ class _TradingDashboardState extends State<TradingDashboard> {
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 24),
+          if (_mtfTrend != null) _MTF_Matrix(mtfTrend: _mtfTrend!),
+          const SizedBox(height: 24),
+          _OIBuildUpHeatmap(
+             symbol: 'NIFTY',
+             summary: _summary['NIFTY'],
+             date: _selectedDate,
+             oiStats: _oiStats['NIFTY'] ?? []
           ),
           const SizedBox(height: 24),
           _buildBarriersSection(context),
@@ -2274,6 +2287,222 @@ class _BarrierSlider extends StatelessWidget {
              ]),
           ]
        )
+    );
+  }
+}
+
+// ── ADVANCED VISUALS: OI BUILDUP HEATMAP ──────────────────────────────────
+class _OIBuildUpHeatmap extends StatefulWidget {
+  final String symbol;
+  final QuickSummary? summary;
+  final String? date;
+  final List<OiStat> oiStats;
+
+  const _OIBuildUpHeatmap({required this.symbol, required this.summary, required this.date, required this.oiStats});
+
+  @override
+  _OIBuildUpHeatmapState createState() => _OIBuildUpHeatmapState();
+}
+
+class _OIBuildUpHeatmapState extends State<_OIBuildUpHeatmap> {
+  List<OptionData>? _chain;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchChain();
+  }
+
+  @override
+  void didUpdateWidget(covariant _OIBuildUpHeatmap oldWidget) {
+    if (oldWidget.summary?.timestamp != widget.summary?.timestamp) {
+      _fetchChain();
+    }
+    super.didUpdateWidget(oldWidget);
+  }
+
+  Future<void> _fetchChain() async {
+    if (widget.date == null || widget.summary == null) return;
+    setState(() => _loading = true);
+    try {
+      final chain = await ApiService().getData(widget.symbol, widget.summary!.timestamp, widget.date!);
+      if (mounted) setState(() => _chain = chain);
+    } catch (e) {
+      // Ignore silence
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading || _chain == null || _chain!.isEmpty || widget.summary?.atm == null) {
+      return const SizedBox.shrink(); // Hide while loading or unavailable
+    }
+
+    final atm = widget.summary!.atm!;
+    final List<OptionData> relevant = [];
+    
+    // Find closest to ATM
+    int atmIndex = -1;
+    double minDiff = double.infinity;
+    for (int i = 0; i < _chain!.length; i++) {
+      final diff = (_chain![i].strikePrice - atm).abs();
+      if (diff < minDiff) { minDiff = diff; atmIndex = i; }
+    }
+
+    if (atmIndex != -1) {
+      final start = (atmIndex - 4).clamp(0, _chain!.length);
+      final end = (atmIndex + 5).clamp(0, _chain!.length);
+      relevant.addAll(_chain!.sublist(start, end));
+    } else {
+      return const SizedBox.shrink();
+    }
+
+    Widget buildBlock(double strike, OptionSide side, String type) {
+      // Determine Buildup logic
+      Color bgColor = kSurface;
+      String label = '-';
+      
+      if (side.change > 0 && side.changeOi > 0) {
+        label = 'Long Buildup'; bgColor = kGreen.withOpacity(0.3);
+      } else if (side.change > 0 && side.changeOi < 0) {
+        label = 'Short Covering'; bgColor = kGreen.withOpacity(0.1);
+      } else if (side.change < 0 && side.changeOi > 0) {
+        label = 'Short Buildup'; bgColor = kRed.withOpacity(0.3);
+      } else if (side.change < 0 && side.changeOi < 0) {
+        label = 'Long Unwinding'; bgColor = kRed.withOpacity(0.1);
+      }
+
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 4.0),
+        width: 100,
+        height: 60,
+        decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white12)),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(type, style: const TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.bold)),
+            Text(label, style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w900), textAlign: TextAlign.center),
+          ]
+        )
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      width: double.infinity,
+      decoration: BoxDecoration(color: kSurface.withOpacity(0.4), borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('${widget.symbol} OI BUILDUP HEATMAP', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+              const Row(
+                 children: [
+                    Icon(Icons.square, color: kGreen, size: 10), SizedBox(width: 4), Text('Long Buildup', style: TextStyle(fontSize: 10, color: Colors.white54)),
+                    SizedBox(width: 12),
+                    Icon(Icons.square, color: Colors.redAccent, size: 10), SizedBox(width: 4), Text('Short Buildup', style: TextStyle(fontSize: 10, color: Colors.white54)),
+                 ]
+              )
+            ]
+          ),
+          const SizedBox(height: 24),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: relevant.map((d) {
+                return Column(
+                  children: [
+                    buildBlock(d.strikePrice, d.ce, 'CALL'),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Text(d.strikePrice.toStringAsFixed(0), style: TextStyle(fontWeight: FontWeight.bold, color: d.strikePrice == atm ? Colors.amber : Colors.white)),
+                    ),
+                    buildBlock(d.strikePrice, d.pe, 'PUT'),
+                  ]
+                );
+              }).toList()
+            )
+          )
+        ]
+      )
+    );
+  }
+}
+
+// ── ADVANCED VISUALS: MULTI-TIMEFRAME MATRIX ──────────────────────────────────
+class _MTF_Matrix extends StatelessWidget {
+  final Map<String, dynamic> mtfTrend;
+
+  const _MTF_Matrix({required this.mtfTrend});
+
+  @override
+  Widget build(BuildContext context) {
+    if (mtfTrend.isEmpty) return const SizedBox.shrink();
+
+    Widget buildMatrixGrid(String symbol, Map<String, dynamic> trends) {
+       return Container(
+         width: 150,
+         margin: const EdgeInsets.only(right: 16),
+         padding: const EdgeInsets.all(12),
+         decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white12)),
+         child: Column(
+           crossAxisAlignment: CrossAxisAlignment.start,
+           children: [
+             Text(symbol, style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 13)),
+             const SizedBox(height: 12),
+             Wrap(
+               spacing: 8, runSpacing: 8,
+               children: ['5m', '15m', '1H', 'Daily'].map((tf) {
+                  final String state = trends[tf] ?? 'Neutral';
+                  Color c = state == 'Bullish' ? kGreen : (state == 'Bearish' ? kRed : Colors.grey);
+                  return Container(
+                    width: 58, height: 40,
+                    decoration: BoxDecoration(
+                      color: c.withOpacity(0.2), borderRadius: BorderRadius.circular(6), border: Border.all(color: c.withOpacity(0.8))
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                           Text(tf, style: const TextStyle(fontSize: 9, color: Colors.white54, fontWeight: FontWeight.bold)),
+                           Text(state, style: TextStyle(fontSize: 10, color: c, fontWeight: FontWeight.w900)),
+                        ]
+                      )
+                    )
+                  );
+               }).toList()
+             )
+           ]
+         )
+       );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      width: double.infinity,
+      decoration: BoxDecoration(color: kSurface.withOpacity(0.4), borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('⏱️ MULTI-TIMEFRAME (MTF) TREND MATRIX', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+          const SizedBox(height: 24),
+          SingleChildScrollView(
+             scrollDirection: Axis.horizontal,
+             child: Row(
+               children: [
+                  if (mtfTrend.containsKey('NIFTY')) buildMatrixGrid('NIFTY', mtfTrend['NIFTY']),
+                  if (mtfTrend.containsKey('BANKNIFTY')) buildMatrixGrid('BANKNIFTY', mtfTrend['BANKNIFTY']),
+                  if (mtfTrend.containsKey('FINNIFTY')) buildMatrixGrid('FINNIFTY', mtfTrend['FINNIFTY']),
+               ]
+             )
+          )
+        ]
+      )
     );
   }
 }

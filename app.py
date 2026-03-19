@@ -6,6 +6,7 @@ import os
 import json
 import time
 from datetime import datetime
+import yfinance as yf
 
 # Simple in-memory cache: {key: (timestamp, data)}
 _cache = {}
@@ -333,6 +334,61 @@ def get_timestamps():
         return jsonify({'error': str(e)}), 500
     finally:
         session.close()
+
+_mtf_cache = {"timestamp": 0, "data": {}}
+
+@app.route('/api/mtf_trend')
+def get_mtf_trend():
+    """Returns Multi-Timeframe Trend (5m, 15m, 1h, 1d) for NIFTY, BANKNIFTY, FINNIFTY"""
+    global _mtf_cache
+    if time.time() - _mtf_cache["timestamp"] < 60 and _mtf_cache["data"]:
+        return jsonify(_mtf_cache["data"])
+        
+    symbols = {
+        "NIFTY": "^NSEI",
+        "BANKNIFTY": "^NSEBANK",
+        "FINNIFTY": "NIFTY_FIN_SERVICE.NS"
+    }
+    
+    intervals = {"5m": "5d", "15m": "5d", "1H": "1mo", "Daily": "3mo"}
+    yf_intervals = {"5m": "5m", "15m": "15m", "1H": "1h", "Daily": "1d"}
+    
+    result = {}
+    try:
+        for sym_name, ticker in symbols.items():
+            result[sym_name] = {}
+            for label, period in intervals.items():
+                interval_str = yf_intervals[label]
+                try:
+                    df = yf.download(ticker, period=period, interval=interval_str, progress=False)
+                    if df.empty or len(df) < 5:
+                        result[sym_name][label] = "Neutral"
+                        continue
+                        
+                    closes = df['Close']
+                    if hasattr(closes, 'squeeze'):
+                        closes = closes.squeeze()
+                    
+                    current_close = float(closes.iloc[-1])
+                    sma5 = float(closes.tail(5).mean())
+                    
+                    if current_close > sma5:
+                        result[sym_name][label] = "Bullish"
+                    elif current_close < sma5:
+                        result[sym_name][label] = "Bearish"
+                    else:
+                        result[sym_name][label] = "Neutral"
+                except Exception as e:
+                    print(f"Error fetching MTF for {sym_name} {label}: {e}")
+                    result[sym_name][label] = "Neutral"
+                    
+        _mtf_cache["timestamp"] = time.time()
+        _mtf_cache["data"] = result
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"MTF Trend Error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/data')
 def get_data():

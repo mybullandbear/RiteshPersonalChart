@@ -25,6 +25,13 @@ class ApiService {
     throw Exception('quick_summary failed: ${r.statusCode}');
   }
 
+  // ── PHASE 1.5: MTF Trend ─────────
+  Future<Map<String, dynamic>> getMtfTrend() async {
+    final r = await http.get(Uri.parse('$_base/mtf_trend')).timeout(_fast);
+    if (r.statusCode == 200) return json.decode(r.body) as Map<String, dynamic>;
+    throw Exception('mtf_trend failed: ${r.statusCode}');
+  }
+
   // ── PHASE 2: OI stats (skip max pain for speed) ──────────
   Future<List<OiStat>> getOiStats(String symbol, String date,
       {bool skipMaxPain = false}) async {
