@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'dart:js' as js;
 import 'dart:html' as html;
 import 'package:flutter/material.dart';
@@ -1560,6 +1561,24 @@ class _HeaderState extends State<_Header> {
   void initState() { super.initState(); _t = Timer.periodic(const Duration(seconds: 1), (_) => setState(() => _now = DateTime.now())); }
   @override
   void dispose() { _t.cancel(); super.dispose(); }
+
+  Widget _buildTabSwitcher() {
+    return Container(
+      height: 38, padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: kSurface2, borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.04)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _TabButton(label: '🌐 MARKET PULSE', active: widget.activeTabIndex == 0, onTap: () => widget.onTabChanged(0)),
+          _TabButton(label: '📊 ANALYTICS', active: widget.activeTabIndex == 1, onTap: () => widget.onTabChanged(1)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isSmall = MediaQuery.of(context).size.width < 700;
