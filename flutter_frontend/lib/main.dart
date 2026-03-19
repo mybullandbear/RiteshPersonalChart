@@ -604,8 +604,8 @@ class _TradingDashboardState extends State<TradingDashboard> {
     for (final sym in ['NIFTY', 'BANKNIFTY', 'FINNIFTY']) {
       final list = _oiStats[sym] ?? [];
       double spot = _summary[sym]?.spot ?? 0;
-      double res = 0; double sup = 0;
-      double maxC = 0; double maxP = 0;
+      double res = 0.0; double sup = 0.0;
+      int maxC = 0; int maxP = 0;
 
       for (final oi in list) {
         if (oi.ceOi > maxC) { maxC = oi.ceOi; res = oi.strikePrice; }
