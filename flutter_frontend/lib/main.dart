@@ -2199,11 +2199,11 @@ class _GaugePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height);
-    final radius = size.width / 2 - 8;
+    final radius = size.width / 2 - 8.0;
     
     final Paint bgPaint = Paint()
       ..color = Colors.white.withOpacity(0.05)
-      ..strokeWidth = 12
+      ..strokeWidth = 12.0
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
@@ -2213,7 +2213,7 @@ class _GaugePainter extends CustomPainter {
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
       ).createShader(Rect.fromCircle(center: center, radius: radius))
-      ..strokeWidth = 14
+      ..strokeWidth = 14.0
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
@@ -2221,7 +2221,7 @@ class _GaugePainter extends CustomPainter {
     canvas.drawArc(Rect.fromCircle(center: center, radius: radius), pi, pi, false, bgPaint);
 
     // Draw active track
-    double sweepAngle = (score / 100) * pi;
+    double sweepAngle = (score / 100.0) * pi;
     if (sweepAngle > 0) {
       canvas.drawArc(Rect.fromCircle(center: center, radius: radius), pi, sweepAngle, false, fillPaint);
     }
@@ -2229,12 +2229,12 @@ class _GaugePainter extends CustomPainter {
     // Draw needle
     final needlePaint = Paint()..color = Colors.white..strokeWidth = 3.5..strokeCap = StrokeCap.round;
     double needleAngle = pi + sweepAngle;
-    double needleLen = radius - 4;
+    double needleLen = radius - 4.0;
     Offset endOffset = Offset(center.dx + needleLen * cos(needleAngle), center.dy + needleLen * sin(needleAngle));
     
     canvas.drawLine(center, endOffset, needlePaint);
-    canvas.drawCircle(center, 7, Paint()..color = kAccent);
-    canvas.drawCircle(center, 4, Paint()..color = Colors.black);
+    canvas.drawCircle(center, 7.0, Paint()..color = kAccent);
+    canvas.drawCircle(center, 4.0, Paint()..color = Colors.black);
   }
 
   @override
@@ -2265,7 +2265,7 @@ class _BarrierSlider extends StatelessWidget {
        padding: const EdgeInsets.all(16),
        decoration: BoxDecoration(
           color: kSurface.withOpacity(0.4),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(12.0),
           border: Border.all(color: Colors.white.withOpacity(0.03)),
        ),
        child: Column(
@@ -2277,10 +2277,10 @@ class _BarrierSlider extends StatelessWidget {
              const SizedBox(height: 14),
              Stack(
                children: [
-                  Container(height: 8, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4))),
+                  Container(height: 8.0, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4.0))),
                   FractionallySizedBox(
                      widthFactor: progress,
-                     child: Container(height: 8, decoration: BoxDecoration(color: accent.withOpacity(0.4), borderRadius: BorderRadius.circular(4))),
+                     child: Container(height: 8.0, decoration: BoxDecoration(color: accent.withOpacity(0.4), borderRadius: BorderRadius.circular(4.0))),
                   ),
                ]
              ),
