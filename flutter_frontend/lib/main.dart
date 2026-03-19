@@ -262,220 +262,181 @@ class _TradingDashboardState extends State<TradingDashboard> {
           ]),
         ],
       ),
-      floatingActionButton: Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: [kAccent, kAccent2]),
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: [
-            BoxShadow(color: kAccent.withOpacity(0.3), blurRadius: 12, spreadRadius: 1),
-          ],
-        ),
-        child: FloatingActionButton.extended(
-          onPressed: () => _showTradingHub(context),
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          icon: const Icon(Icons.hub, color: Colors.white),
-          label: const Text('COMMAND HUB', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-        ),
-      ),
     );
   }
 
-  void _showTradingHub(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: kBg,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setModalState) {
-            return FutureBuilder<Map<String, dynamic>>(
-              future: _api.getTradingState(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                   return const SizedBox(height: 300, child: Center(child: CircularProgressIndicator()));
-                }
-                if (snapshot.hasError) {
-                   return SizedBox(height: 300, child: Center(child: Text('Error loading trading state:\n${snapshot.error}', style: const TextStyle(color: kRed))));
-                }
+  Widget _buildCommandHubTier() {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _api.getTradingState(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+           return const SizedBox(height: 300, child: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError) {
+           return SizedBox(height: 300, child: Center(child: Text('Error loading trading state:\n${snapshot.error}', style: const TextStyle(color: kRed))));
+        }
 
-                final state = snapshot.data!;
-                final bool isPaper = state['paper_trading'] ?? true;
-                final bool isAuto = state['trading_enabled'] ?? false;
-                final Map<String, dynamic> positions = state['positions'] ?? {};
+        final state = snapshot.data!;
+        final bool isPaper = state['paper_trading'] ?? true;
+        final bool isAuto = state['trading_enabled'] ?? false;
+        final Map<String, dynamic> positions = state['positions'] ?? {};
 
-                return Container(
-                  height: MediaQuery.of(context).size.height * 0.7,
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('COMMAND CENTER', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white)),
-                          IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.pop(context))
-                        ]
-                      ),
-                      const SizedBox(height: 24),
-                      
-                      // Auto Trading Toggles
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(16)),
-                        child: Column(
-                          children: [
-                            SwitchListTile(
-                              title: const Text('PAPER TRADING MODE', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
-                              subtitle: const Text('Simulate trades using local data instead of Zerodha', style: TextStyle(color: Colors.white54)),
-                              value: isPaper,
-                              activeColor: Colors.amber,
-                              onChanged: (val) async {
-                                 await _api.toggleTradingConfig(paperTrading: val);
-                                 setModalState((){}); // Refresh modal
-                              }
-                            ),
-                            const Divider(color: Colors.white10),
-                            SwitchListTile(
-                              title: const Text('AUTO TRADING ALGORITHM', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent)),
-                              subtitle: const Text('Automatically execute entry signals when triggered', style: TextStyle(color: Colors.white54)),
-                              value: isAuto,
-                              activeColor: Colors.blueAccent,
-                              onChanged: (val) async {
-                                 await _api.toggleTradingConfig(tradingEnabled: val);
-                                 setModalState((){});
-                              }
-                            ),
-                          ]
-                        )
-                      ),
-                      
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Colors.blueAccent, width: 1.5),
-                            padding: const EdgeInsets.all(16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          onPressed: () {
-                             Navigator.pop(context); // Close current hub
-                             _showTradeHistory(context); // Open history
-                          },
-                          icon: const Icon(Icons.history, color: Colors.blueAccent),
-                          label: const Text('VIEW TRADE HISTORY LEDGER', style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.w900)),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      const Text('ACTIVE POSITIONS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white54, letterSpacing: 1.5)),
-                      const SizedBox(height: 12),
-                      
-                      Expanded(
-                        child: ListView(
-                          children: positions.entries.map((e) {
-                            final String symbol = e.key;
-                            final pos = e.value;
-                            if (pos == null) {
-                               return Card(
-                                 color: kSurface,
-                                 child: ListTile(
-                                   title: Text(symbol, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                                   trailing: const Text('NO ACTIVE POSITION', style: TextStyle(color: Colors.white30, fontWeight: FontWeight.bold)),
-                                 )
-                               );
-                            }
-                            
-                            // Render Active Position
-                            final isPaperPos = pos['trading_symbol']?.startsWith('PAPER') ?? false;
-                            
-                            return Card(
-                                 color: kSurface,
-                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: isPaperPos ? Colors.amber.withOpacity(0.5) : Colors.blue.withOpacity(0.5))),
-                                 child: Padding(
-                                   padding: const EdgeInsets.all(16),
-                                   child: Column(
-                                     crossAxisAlignment: CrossAxisAlignment.start,
-                                     children: [
-                                       Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(symbol, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
-                                            Row(
-                                              children: [
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                  decoration: BoxDecoration(color: isPaperPos ? Colors.amber.withOpacity(0.2) : Colors.blue.withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
-                                                  child: Text(isPaperPos ? 'PAPER TRADE' : 'LIVE TRADE', style: TextStyle(color: isPaperPos ? Colors.amber : Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 10))
-                                                ),
-                                                const SizedBox(width: 8),
-                                                IconButton(
-                                                  icon: const Icon(Icons.cancel, color: Colors.white54, size: 20),
-                                                  padding: EdgeInsets.zero,
-                                                  constraints: const BoxConstraints(),
-                                                  onPressed: () async {
-                                                     await ApiService().closePosition(symbol);
-                                                     setModalState((){}); // Refresh GUI
-                                                  }
-                                                )
-                                              ]
-                                            )
-                                          ]
-                                       ),
-                                       const SizedBox(height: 8),
-                                       Text('SELL ${pos['strike']} ${pos['type']} • Qty: ${pos['quantity']}', style: TextStyle(color: pos['type'] == 'CE' ? kRed : kGreen, fontWeight: FontWeight.bold, fontSize: 16)),
-                                       const SizedBox(height: 12),
-                                       Row(
-                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                         children: [
-                                           Column(
-                                             crossAxisAlignment: CrossAxisAlignment.start,
-                                             children: [
-                                                const Text('ENTRY PRICE', style: TextStyle(color: Colors.white54, fontSize: 10)),
-                                                Text('₹${pos['entry_price']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))
-                                             ]
-                                           ),
-                                           Column(
-                                             crossAxisAlignment: CrossAxisAlignment.end,
-                                             children: [
-                                                const Text('ENTRY TIME', style: TextStyle(color: Colors.white54, fontSize: 10)),
-                                                Text('${pos['timestamp']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12))
-                                             ]
-                                           )
-                                         ]
-                                       ),
-                                       if (pos['current_profit'] != null) ...[
-                                         const SizedBox(height: 12),
-                                         const Divider(color: Colors.white10),
-                                         Row(
-                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                           children: [
-                                             const Text('CURRENT P&L', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                                             Text(
-                                               (pos['current_profit'] as num) >= 0 ? '+₹${(pos['current_profit'] as num).toStringAsFixed(2)}' : '-₹${(pos['current_profit'] as num).abs().toStringAsFixed(2)}',
-                                               style: TextStyle(
-                                                 color: (pos['current_profit'] as num) >= 0 ? kGreen : kRed,
-                                                 fontWeight: FontWeight.w900, fontSize: 24,
-                                                 shadows: [Shadow(color: (pos['current_profit'] as num) >= 0 ? kGreen : kRed, blurRadius: 10)]
-                                               )
-                                             )
-                                           ]
-                                         )
-                                       ]
-                                     ]
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('⚡ COMMAND CENTER', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white)),
+              const SizedBox(height: 24),
+              
+              // Auto Trading Toggles
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(16)),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      title: const Text('PAPER TRADING MODE', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
+                      subtitle: const Text('Simulate trades using local data instead of Zerodha', style: TextStyle(color: Colors.white54)),
+                      value: isPaper,
+                      activeColor: Colors.amber,
+                      onChanged: (val) async {
+                         await _api.toggleTradingConfig(paperTrading: val);
+                         setState((){});
+                      }
+                    ),
+                    const Divider(color: Colors.white10),
+                    SwitchListTile(
+                      title: const Text('AUTO TRADING ALGORITHM', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+                      subtitle: const Text('Automatically execute entry signals when triggered', style: TextStyle(color: Colors.white54)),
+                      value: isAuto,
+                      activeColor: Colors.blueAccent,
+                      onChanged: (val) async {
+                         await _api.toggleTradingConfig(tradingEnabled: val);
+                         setState((){});
+                      }
+                    ),
+                  ]
+                )
+              ),
+              
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.blueAccent, width: 1.5),
+                    padding: const EdgeInsets.all(16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                     _showTradeHistory(context);
+                  },
+                  icon: const Icon(Icons.history, color: Colors.blueAccent),
+                  label: const Text('VIEW TRADE HISTORY LEDGER', style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.w900)),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text('ACTIVE POSITIONS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white54, letterSpacing: 1.5)),
+              const SizedBox(height: 12),
+              
+              ...positions.entries.map((e) {
+                final String symbol = e.key;
+                final pos = e.value;
+                if (pos == null) {
+                   return Card(
+                     color: kSurface,
+                     child: ListTile(
+                       title: Text(symbol, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                       trailing: const Text('NO ACTIVE POSITION', style: TextStyle(color: Colors.white30, fontWeight: FontWeight.bold)),
+                     )
+                   );
+                }
+                
+                // Render Active Position
+                final isPaperPos = pos['trading_symbol']?.startsWith('PAPER') ?? false;
+                
+                return Card(
+                     color: kSurface,
+                     margin: const EdgeInsets.only(bottom: 12),
+                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: isPaperPos ? Colors.amber.withOpacity(0.5) : Colors.blue.withOpacity(0.5))),
+                     child: Padding(
+                       padding: const EdgeInsets.all(16),
+                       child: Column(
+                         crossAxisAlignment: CrossAxisAlignment.start,
+                         children: [
+                           Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(symbol, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(color: isPaperPos ? Colors.amber.withOpacity(0.2) : Colors.blue.withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
+                                      child: Text(isPaperPos ? 'PAPER TRADE' : 'LIVE TRADE', style: TextStyle(color: isPaperPos ? Colors.amber : Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 10))
+                                    ),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      icon: const Icon(Icons.cancel, color: Colors.white54, size: 20),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      onPressed: () async {
+                                         await _api.closePosition(symbol);
+                                         setState((){});
+                                      }
+                                    )
+                                  ]
+                                )
+                              ]
+                           ),
+                           const SizedBox(height: 8),
+                           Text('SELL ${pos['strike']} ${pos['type']} • Qty: ${pos['quantity']}', style: TextStyle(color: pos['type'] == 'CE' ? kRed : kGreen, fontWeight: FontWeight.bold, fontSize: 16)),
+                           const SizedBox(height: 12),
+                           Row(
+                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                             children: [
+                               Column(
+                                 crossAxisAlignment: CrossAxisAlignment.start,
+                                 children: [
+                                    const Text('ENTRY PRICE', style: TextStyle(color: Colors.white54, fontSize: 10)),
+                                    Text('₹${pos['entry_price']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))
+                                 ]
+                               ),
+                               Column(
+                                 crossAxisAlignment: CrossAxisAlignment.end,
+                                 children: [
+                                    const Text('ENTRY TIME', style: TextStyle(color: Colors.white54, fontSize: 10)),
+                                    Text('${pos['timestamp']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12))
+                                 ]
+                               )
+                             ]
+                           ),
+                           if (pos['current_profit'] != null) ...[
+                             const SizedBox(height: 12),
+                             const Divider(color: Colors.white10),
+                             Row(
+                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                               children: [
+                                 const Text('CURRENT P&L', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                 Text(
+                                   (pos['current_profit'] as num) >= 0 ? '+₹${(pos['current_profit'] as num).toStringAsFixed(2)}' : '-₹${(pos['current_profit'] as num).abs().toStringAsFixed(2)}',
+                                   style: TextStyle(
+                                     color: (pos['current_profit'] as num) >= 0 ? kGreen : kRed,
+                                     fontWeight: FontWeight.w900, fontSize: 24,
+                                     shadows: [Shadow(color: (pos['current_profit'] as num) >= 0 ? kGreen : kRed, blurRadius: 10)]
                                    )
                                  )
-                               );
-                          }).toList()
-                        )
-                      )
-                    ]
-                  )
-                );
-              }
-            );
-          }
+                               ]
+                             )
+                           ]
+                         ]
+                       )
+                     )
+                   );
+              }),
+            ]
+          )
         );
       }
     );
@@ -560,7 +521,9 @@ class _TradingDashboardState extends State<TradingDashboard> {
     if (_initialLoading) return const Center(child: _Spinner(label: 'Connecting to backend…'));
     if (_error != null) return _ErrorView(message: _error!, onRetry: _boot);
     
-    return _activeTabIndex == 0 ? _buildPulseTier() : _buildAnalyticsTier();
+    if (_activeTabIndex == 0) return _buildPulseTier();
+    if (_activeTabIndex == 1) return _buildAnalyticsTier();
+    return _buildCommandHubTier();
   }
 
   Widget _buildPulseTier() {
@@ -568,15 +531,18 @@ class _TradingDashboardState extends State<TradingDashboard> {
     double nPcr = _summary['NIFTY']?.pcr ?? 1.0;
     double bPcr = _summary['BANKNIFTY']?.pcr ?? 1.0;
     double fPcr = _summary['FINNIFTY']?.pcr ?? 1.0;
-    double avgPcr = (nPcr + bPcr + fPcr) / 3;
-    double score = (((avgPcr - 0.5) / 1.0) * 100).clamp(0.0, 100.0);
+    double avgPcr = (nPcr + bPcr + fPcr) / 3.0;
+    
+    double getScore(double pcr) => (((pcr - 0.5) / 1.0) * 100.0).clamp(0.0, 100.0);
+    double score = getScore(avgPcr);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(24),
+            width: double.infinity,
             decoration: BoxDecoration(
               color: kSurface.withOpacity(0.4),
               borderRadius: BorderRadius.circular(16),
@@ -585,8 +551,18 @@ class _TradingDashboardState extends State<TradingDashboard> {
             child: Column(
               children: [
                 const Text('📊 AGGREGATED MARKET SENTIMENT', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-                const SizedBox(height: 25),
-                _SpeedometerGauge(score: score, label: 'AVG PCR: ${avgPcr.toStringAsFixed(2)}'),
+                const SizedBox(height: 35),
+                Wrap(
+                  spacing: 40,
+                  runSpacing: 40,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    _SpeedometerGauge(score: score, label: 'AVG PCR: ${avgPcr.toStringAsFixed(2)}'),
+                    _SpeedometerGauge(score: getScore(nPcr), label: 'NIFTY (${nPcr.toStringAsFixed(2)})'),
+                    _SpeedometerGauge(score: getScore(bPcr), label: 'BANKNIFTY (${bPcr.toStringAsFixed(2)})'),
+                    _SpeedometerGauge(score: getScore(fPcr), label: 'FINNIFTY (${fPcr.toStringAsFixed(2)})'),
+                  ],
+                ),
               ],
             ),
           ),
@@ -1574,6 +1550,7 @@ class _HeaderState extends State<_Header> {
         children: [
           _TabButton(label: '🌐 MARKET PULSE', active: widget.activeTabIndex == 0, onTap: () => widget.onTabChanged(0)),
           _TabButton(label: '📊 ANALYTICS', active: widget.activeTabIndex == 1, onTap: () => widget.onTabChanged(1)),
+          _TabButton(label: '⚡ COMMAND HUB', active: widget.activeTabIndex == 2, onTap: () => widget.onTabChanged(2)),
         ],
       ),
     );
