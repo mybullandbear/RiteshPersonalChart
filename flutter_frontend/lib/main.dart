@@ -2365,13 +2365,16 @@ class _OIBuildUpHeatmapState extends State<_OIBuildUpHeatmap> {
       Color bgColor = kSurface;
       String label = '-';
       
-      if (side.change > 0 && side.changeOi > 0) {
+      double chg = side.change ?? 0.0;
+      int chgOi = side.changeOi ?? 0;
+      
+      if (chg > 0 && chgOi > 0) {
         label = 'Long Buildup'; bgColor = kGreen.withOpacity(0.3);
-      } else if (side.change > 0 && side.changeOi < 0) {
+      } else if (chg > 0 && chgOi < 0) {
         label = 'Short Covering'; bgColor = kGreen.withOpacity(0.1);
-      } else if (side.change < 0 && side.changeOi > 0) {
+      } else if (chg < 0 && chgOi > 0) {
         label = 'Short Buildup'; bgColor = kRed.withOpacity(0.3);
-      } else if (side.change < 0 && side.changeOi < 0) {
+      } else if (chg < 0 && chgOi < 0) {
         label = 'Long Unwinding'; bgColor = kRed.withOpacity(0.1);
       }
 
