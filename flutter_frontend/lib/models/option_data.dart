@@ -38,10 +38,11 @@ class OiStat {
   final double pcr;
   final double spot;
   final double maxPain;
+  final double strikePrice;
 
   OiStat({required this.timestamp, required this.ceOi, required this.peOi,
     required this.ceChangeOi, required this.peChangeOi,
-    required this.pcr, required this.spot, required this.maxPain});
+    required this.pcr, required this.spot, required this.maxPain, required this.strikePrice});
 
   factory OiStat.fromJson(Map<String, dynamic> j) => OiStat(
     timestamp:  j['timestamp'] ?? '',
@@ -52,6 +53,7 @@ class OiStat {
     pcr:        (j['pcr'] ?? 0.0).toDouble(),
     spot:       (j['spot'] ?? 0.0).toDouble(),
     maxPain:    (j['max_pain'] ?? 0.0).toDouble(),
+    strikePrice:(j['strike_price'] ?? 0.0).toDouble(),
   );
 }
 
