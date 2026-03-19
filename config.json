@@ -8,6 +8,7 @@
     "quantity": 75,
     "NIFTY_LOT": 65,
     "BANKNIFTY_LOT": 30,
+    "FINNIFTY_LOT": 40,
     "STOP_LOSS": 1500,
     "app_password": "mybullandbearadmin"
 }

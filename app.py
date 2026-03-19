@@ -79,7 +79,8 @@ def trading_config_endpoint():
     if request.method == 'GET':
         return jsonify(state.get("config", {
             "NIFTY_EXPIRY": None,
-            "BANKNIFTY_EXPIRY": None
+            "BANKNIFTY_EXPIRY": None,
+            "FINNIFTY_EXPIRY": None
         }))
         
     if request.method == 'POST':
@@ -93,8 +94,8 @@ def trading_config_endpoint():
         if "BANKNIFTY_EXPIRY" in new_config:
             state["config"]["BANKNIFTY_EXPIRY"] = new_config["BANKNIFTY_EXPIRY"]
             
-        if "BANKNIFTY_EXPIRY" in new_config:
-            state["config"]["BANKNIFTY_EXPIRY"] = new_config["BANKNIFTY_EXPIRY"]
+        if "FINNIFTY_EXPIRY" in new_config:
+            state["config"]["FINNIFTY_EXPIRY"] = new_config["FINNIFTY_EXPIRY"]
             
         zerodha_trader.trader.save_trading_state(state)
         return jsonify({"success": True, "config": state["config"]})
@@ -383,7 +384,7 @@ def get_data():
 @app.route('/api/spots')
 def get_latest_spots():
     """Returns the latest spot price for all indices. Defaults to latest DB file."""
-    symbols = ["NIFTY", "BANKNIFTY"]
+    symbols = ["NIFTY", "BANKNIFTY", "FINNIFTY"]
     response = {}
     
     date_str = request.args.get('date')
@@ -543,7 +544,7 @@ def get_signals():
     session = Session()
     
     response = {}
-    symbols = ["NIFTY", "BANKNIFTY"]
+    symbols = ["NIFTY", "BANKNIFTY", "FINNIFTY"]
     
     from datetime import timedelta
     
@@ -636,7 +637,7 @@ def quick_summary():
     """Single fast endpoint: returns spots + latest signals + PCR for both symbols.
     Designed to load in < 1 second for the dashboard header."""
     date_str = request.args.get('date')
-    symbols = ['NIFTY', 'BANKNIFTY']
+    symbols = ['NIFTY', 'BANKNIFTY', 'FINNIFTY']
     result = {}
 
     # Find latest date if not provided

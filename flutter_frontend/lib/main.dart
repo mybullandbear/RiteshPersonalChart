@@ -559,17 +559,30 @@ class _TradingDashboardState extends State<TradingDashboard> {
             _Panel(symbol: 'BANKNIFTY', date: _selectedDate!, accent: kBank,  summary: _summary['BANKNIFTY'],
               oiStats: _oiStats['BANKNIFTY'] ?? [], oiLoading: _oiLoading['BANKNIFTY'] ?? false,
               border: false, isMobile: true),
+            const Divider(color: kBorder, height: 1, thickness: 1.5),
+            _Panel(symbol: 'FINNIFTY', date: _selectedDate!, accent: Colors.purple,  summary: _summary['FINNIFTY'],
+              oiStats: _oiStats['FINNIFTY'] ?? [], oiLoading: _oiLoading['FINNIFTY'] ?? false,
+              border: false, isMobile: true),
           ],
         );
       } else {
         // Desktop Side-by-Side View
         return Row(children: [
-          _Panel(symbol: 'NIFTY', date: _selectedDate!, accent: kNifty, summary: _summary['NIFTY'],
-            oiStats: _oiStats['NIFTY'] ?? [], oiLoading: _oiLoading['NIFTY'] ?? false,
-            border: true, isMobile: false),
-          _Panel(symbol: 'BANKNIFTY', date: _selectedDate!, accent: kBank,  summary: _summary['BANKNIFTY'],
-            oiStats: _oiStats['BANKNIFTY'] ?? [], oiLoading: _oiLoading['BANKNIFTY'] ?? false,
-            border: false, isMobile: false),
+          Expanded(
+            child: _Panel(symbol: 'NIFTY', date: _selectedDate!, accent: kNifty, summary: _summary['NIFTY'],
+              oiStats: _oiStats['NIFTY'] ?? [], oiLoading: _oiLoading['NIFTY'] ?? false,
+              border: true, isMobile: false),
+          ),
+          Expanded(
+            child: _Panel(symbol: 'BANKNIFTY', date: _selectedDate!, accent: kBank,  summary: _summary['BANKNIFTY'],
+              oiStats: _oiStats['BANKNIFTY'] ?? [], oiLoading: _oiLoading['BANKNIFTY'] ?? false,
+              border: true, isMobile: false),
+          ),
+          Expanded(
+            child: _Panel(symbol: 'FINNIFTY', date: _selectedDate!, accent: Colors.purple,  summary: _summary['FINNIFTY'],
+              oiStats: _oiStats['FINNIFTY'] ?? [], oiLoading: _oiLoading['FINNIFTY'] ?? false,
+              border: false, isMobile: false),
+          ),
         ]);
       }
     });
@@ -585,8 +598,10 @@ class _GlobalSignalsBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final String nSig = summary['NIFTY']?.signal ?? '';
     final String bSig = summary['BANKNIFTY']?.signal ?? '';
-    bool bullish = nSig.contains('BUY') && bSig.contains('BUY');
-    bool bearish = nSig.contains('SELL') && bSig.contains('SELL');
+    final String fSig = summary['FINNIFTY']?.signal ?? '';
+    
+    bool bullish = nSig.contains('BUY') && bSig.contains('BUY') && fSig.contains('BUY');
+    bool bearish = nSig.contains('SELL') && bSig.contains('SELL') && fSig.contains('SELL');
     
     String conf = "NEUTRAL 🟡";
     Color confColor = Colors.amber;
@@ -604,9 +619,10 @@ class _GlobalSignalsBar extends StatelessWidget {
         child: Row(
           children: [
             Expanded(child: _SignalCard(symbol: 'NIFTY', accent: kNifty, summary: summary['NIFTY'])),
+            Expanded(child: _SignalCard(symbol: 'BANKNIFTY', accent: kBank, summary: summary['BANKNIFTY'])),
             
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: confColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20),
@@ -614,11 +630,11 @@ class _GlobalSignalsBar extends StatelessWidget {
               ),
               child: Text(
                 conf,
-                style: TextStyle(color: confColor, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                style: TextStyle(color: confColor, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5),
               ),
             ),
 
-            Expanded(child: _SignalCard(symbol: 'BANKNIFTY', accent: kBank, summary: summary['BANKNIFTY'])),
+            Expanded(child: _SignalCard(symbol: 'FINNIFTY', accent: Colors.purple, summary: summary['FINNIFTY'])),
           ],
         ),
       ),

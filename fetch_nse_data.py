@@ -12,7 +12,7 @@ import market_signals
 import zerodha_trader
 
 # --- Configuration ---
-INDICES = ["NIFTY", "BANKNIFTY"]
+INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY"]
 DATA_DIR = "data"
 EXPIRIES_FILE = "expiries.json"
 LINKS_FILE = "nse_links.txt"
@@ -172,7 +172,7 @@ def get_target_expiry(symbol, available_expiries):
                 return d_str
         return expiry_dates[0][1]
 
-    elif symbol == "BANKNIFTY":
+    elif symbol in ["BANKNIFTY", "FINNIFTY"]:
         # Rule: Last Tuesday of the month
         # Use first available expiry's month to find target
         first_dt = expiry_dates[0][0]

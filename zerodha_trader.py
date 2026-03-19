@@ -23,7 +23,8 @@ class PaperTrader:
             "paper_trading": True, # Force reality
             "positions": {
                 "NIFTY": None,
-                "BANKNIFTY": None
+                "BANKNIFTY": None,
+                "FINNIFTY": None
             }
         }
         if not os.path.exists(TRADING_STATE_FILE):
@@ -83,14 +84,18 @@ class PaperTrader:
         # 🚀 Dynamic Sizing and Risk Values
         nifty_lot = 65
         banknifty_lot = 30
+        finnifty_lot = 40
         try:
             with open("config.json", 'r') as f:
                 c = json.load(f)
                 nifty_lot = c.get("NIFTY_LOT", 65)
                 banknifty_lot = c.get("BANKNIFTY_LOT", 30)
+                finnifty_lot = c.get("FINNIFTY_LOT", 40)
         except: pass
         
-        quantity = nifty_lot if symbol == "NIFTY" else banknifty_lot
+        if symbol == "NIFTY": quantity = nifty_lot
+        elif symbol == "BANKNIFTY": quantity = banknifty_lot
+        else: quantity = finnifty_lot
         
         # Record paper trade
         if "positions" not in state: state["positions"] = {}
