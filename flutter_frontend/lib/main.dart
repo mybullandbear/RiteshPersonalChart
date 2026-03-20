@@ -619,7 +619,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
             child: Center(
               child: Text(
                 strategyText,
-                style: TextStyle(color: strategyColor, fontSize: 13, fontWeight: FontWeight.black, letterSpacing: 1.5),
+                style: TextStyle(color: strategyColor, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1.5),
               ),
             ),
           ),
