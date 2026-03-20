@@ -200,8 +200,8 @@ class _TradingDashboardState extends State<TradingDashboard> {
     final s = _summary[sym];
     if (s == null) return 50.0;
     
-    // 1. PCR Sentiment Component (50%)
-    double pcr = s.pcr;
+    // 1. Near-ATM PCR Sentiment Component (50%)
+    double pcr = s.nearPcr ?? s.pcr;
     double pcrScore = (((pcr - 0.5) / 1.0) * 100.0).clamp(0.0, 100.0);
     
     // 2. Confluence Components & Signals (50%)
@@ -561,7 +561,18 @@ class _TradingDashboardState extends State<TradingDashboard> {
     double fPcr = _summary['FINNIFTY']?.pcr ?? 1.0;
     double avgPcr = (nPcr + bPcr + fPcr) / 3.0;
 
-    return SingleChildScrollView(
+    Color glowColor = Colors.transparent;
+    if (avgScore > 65) glowColor = kGreen.withOpacity(0.06);
+    else if (avgScore < 35) glowColor = kRed.withOpacity(0.06);
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          colors: [glowColor, Colors.transparent],
+          center: Alignment.topCenter, radius: 1.2
+        )
+      ),
+      child: SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
@@ -604,7 +615,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
           _buildBarriersSection(context),
         ],
       ),
-    );
+    ),);
   }
 
   Widget _buildBarriersSection(BuildContext context) {
@@ -938,9 +949,16 @@ class _SignalCardState extends State<_SignalCard> with SingleTickerProviderState
               
               const Spacer(),
               
+              // Strike Suggestion
+              if (widget.summary!.suggestedStrike != null) ...[
+                Text('🎯 ${widget.summary!.suggestedStrike!.toStringAsFixed(0)}', 
+                  style: const TextStyle(color: Colors.amberAccent, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                const SizedBox(width: 8),
+              ],
+              
               // Spot
               Text(NumberFormat('#,##0').format(widget.summary!.spot), 
-                style: kMono.copyWith(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+                style: kMono.copyWith(fontSize: 10, color: Colors.white60, fontWeight: FontWeight.normal)),
               
               if (isStrongSignal) ...[
                 const SizedBox(width: 8),

@@ -772,6 +772,20 @@ def quick_summary():
                 elif pe_s and not ce_s:   signal, color = 'SELL PE (Bullish)', 'green'
                 elif sum_ce_chg_oi > 0 and sum_pe_chg_oi > 0: signal, color = 'SELL BOTH (Range)', 'orange'
 
+                # Calculate Near-ATM PCR for better Gauge accuracy
+                near_ce_oi_total = sum(r.ce_oi or 0 for r in near_strikes)
+                near_pe_oi_total = sum(r.pe_oi or 0 for r in near_strikes)
+                near_pcr = round(near_pe_oi_total / near_ce_oi_total, 2) if near_ce_oi_total > 0 else 0
+                
+                # Strike suggestion
+                suggested_strike = atm.strike_price
+                step = 100 if sym in ['BANKNIFTY'] else (50 if sym == 'NIFTY' else 100)
+                if 'SELL CE' in signal: suggested_strike += step
+                elif 'SELL PE' in signal: suggested_strike -= step
+            else:
+                near_pcr = pcr
+                suggested_strike = None
+
             # Calculate Confluence & Dynamic Exit Alerts based on 5-minute momentum
             confluence = 50
             exit_alert = None
@@ -822,7 +836,9 @@ def quick_summary():
                 'ce_oi':     total_ce_oi,
                 'pe_oi':     total_pe_oi,
                 'pcr':       pcr,
+                'near_pcr':  near_pcr,
                 'confluence': confluence,
+                'suggested_strike': suggested_strike,
                 'exit_alert': exit_alert
             }
             
