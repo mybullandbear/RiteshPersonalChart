@@ -2385,7 +2385,11 @@ class _TripleIndexConfluence extends StatelessWidget {
     for (var k in ['NIFTY', 'BANKNIFTY', 'FINNIFTY']) {
        if (summary[k] != null) {
           double pcr = summary[k]!.pcr;
-          avgScore += (((pcr - 0.5) / 1.0) * 100).clamp(0, 100);
+          double pcrScore = (((pcr - 0.5) / 1.0) * 100).clamp(0, 100);
+          double conf = summary[k]!.confluence.toDouble();
+          
+          // Weighted: 40% Absolute PCR + 60% Confluence momentum (including Change in OI checks from backend)
+          avgScore += (pcrScore * 0.4) + (conf * 0.6);
           count++;
        }
     }
