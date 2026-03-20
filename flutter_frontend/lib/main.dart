@@ -950,6 +950,15 @@ class _SignalCardState extends State<_SignalCard> with SingleTickerProviderState
     super.dispose();
   }
 
+  Color _sColor(String? c) {
+    switch (c) { 
+      case 'green': return kGreen; 
+      case 'red': return kRed;
+      case 'orange': return kOrange; 
+      default: return kGrey; 
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.summary == null) {
