@@ -573,8 +573,9 @@ class _TradingDashboardState extends State<TradingDashboard> {
     final double width = MediaQuery.of(context).size.width;
     final bool isSmall = width < 900;
 
-    return _BreathingBackdrop(
+    return _LiveScenarioBackground(
       color: glowColor,
+      score: avgScore,
       child: SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -605,6 +606,11 @@ class _TradingDashboardState extends State<TradingDashboard> {
               ],
             ),
           ),
+          const SizedBox(height: 24),
+
+          // ⚡ Triple Index Confluence Alignment
+          _TripleIndexConfluence(summary: _summary),
+          
           const SizedBox(height: 24),
           
           // 🎫 Strategy Banner Card
@@ -2352,6 +2358,179 @@ class _GaugePainter extends CustomPainter {
   }
 
   @override
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+// ─── TRIPLE INDEX CONFLUENCE ALIGNMENT ───────────────────────────
+class _TripleIndexConfluence extends StatelessWidget {
+  final Map<String, QuickSummary> summary;
+  const _TripleIndexConfluence({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    double nPcr = summary['NIFTY']?.pcr ?? 1.0;
+    double bPcr = summary['BANKNIFTY']?.pcr ?? 1.0;
+    double fPcr = summary['FINNIFTY']?.pcr ?? 1.0;
+
+    bool nBull = nPcr > 1.0;
+    bool bBull = bPcr > 1.0;
+    bool fBull = fPcr > 1.0;
+
+    double avgScore = 0;
+    int count = 0;
+    for (var k in ['NIFTY', 'BANKNIFTY', 'FINNIFTY']) {
+       if (summary[k] != null) {
+          double pcr = summary[k]!.pcr;
+          avgScore += (((pcr - 0.5) / 1.0) * 100).clamp(0, 100);
+          count++;
+       }
+    }
+    if (count > 0) avgScore /= count;
+
+    String biasText = avgScore > 50 ? 'BULLISH BIAS' : 'BEARISH BIAS';
+    Color biasColor = avgScore > 50 ? kGreen : kRed;
+
+    Widget buildBubble(String label, bool isBull) {
+      Color c = isBull ? kGreen : kRed;
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(shape: BoxShape.circle, color: c.withOpacity(0.15), border: Border.all(color: c.withOpacity(0.4), width: 1.5)),
+        child: Text(label, style: TextStyle(color: c, fontSize: 10, fontWeight: FontWeight.w900)),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kSurface.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.04))
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                   Icon(Icons.flash_on, color: Colors.amberAccent, size: 14),
+                   SizedBox(width: 4),
+                   Text('TRIPLE-INDEX ALIGNMENT', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  buildBubble('NF', nBull),
+                  const SizedBox(width: 8),
+                  buildBubble('BN', bBull),
+                  const SizedBox(width: 8),
+                  buildBubble('FN', fBull),
+                ],
+              )
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(biasText, style: TextStyle(color: biasColor, fontSize: 14, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 4),
+              Text('Score: ${avgScore.toStringAsFixed(0)}%', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+            ],
+          )
+        ],
+      )
+    );
+  }
+}
+
+class _Particle {
+  Offset position;
+  double speed;
+  double radius;
+  double opacity;
+  _Particle({required this.position, required this.speed, required this.radius, required this.opacity});
+}
+
+// ─── LIVE SCENARIO BACKGROUND: BOKEH PARTICLES ──────────────────
+class _LiveScenarioBackground extends StatefulWidget {
+  final Widget child;
+  final Color color;
+  final double score; 
+  const _LiveScenarioBackground({required this.child, required this.color, required this.score});
+
+  @override
+  State<_LiveScenarioBackground> createState() => _LiveScenarioBackgroundState();
+}
+
+class _LiveScenarioBackgroundState extends State<_LiveScenarioBackground> with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  final List<_Particle> _particles = [];
+  final Random _rnd = Random();
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(seconds: 1))..repeat();
+    for (int i = 0; i < 25; i++) {
+        _particles.add(_Particle(
+          position: Offset(_rnd.nextDouble() * 400, _rnd.nextDouble() * 800),
+          speed: 0.15 + _rnd.nextDouble() * 0.3,
+          radius: 3.0 + _rnd.nextDouble() * 4.0,
+          opacity: 0.04 + _rnd.nextDouble() * 0.08,
+        ));
+    }
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    double dy = widget.score > 55 ? -1.0 : 1.0; 
+
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, child) {
+        final size = MediaQuery.of(context).size;
+        for (var p in _particles) {
+           double newY = p.position.dy + (dy * p.speed);
+           if (newY < 0) newY = size.height;
+           if (newY > size.height) newY = 0;
+           p.position = Offset(p.position.dx, newY);
+        }
+
+        return CustomPaint(
+          painter: _ParticlePainter(particles: _particles, color: widget.color),
+          child: widget.child,
+        );
+      }
+    );
+  }
+}
+
+class _ParticlePainter extends CustomPainter {
+  final List<_Particle> particles;
+  final Color color;
+  _ParticlePainter({required this.particles, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bgPaint = Paint()..shader = RadialGradient(
+       colors: [color.withOpacity(0.08), Colors.transparent],
+       center: Alignment.topCenter, radius: 1.3
+    ).createShader(Offset.zero & size);
+    canvas.drawRect(Offset.zero & size, bgPaint);
+
+    for (var p in particles) {
+       final Paint pPaint = Paint()..color = color.withOpacity(p.opacity)..style = PaintingStyle.fill;
+       canvas.drawCircle(p.position, p.radius, pPaint);
+    }
+  }
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
