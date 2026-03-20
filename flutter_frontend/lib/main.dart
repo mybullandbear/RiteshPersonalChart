@@ -196,6 +196,26 @@ class _TradingDashboardState extends State<TradingDashboard> {
     }
   }
 
+  double _getCompositeScore(String sym) {
+    final s = _summary[sym];
+    if (s == null) return 50.0;
+    
+    // 1. PCR Sentiment Component (50%)
+    double pcr = s.pcr;
+    double pcrScore = (((pcr - 0.5) / 1.0) * 100.0).clamp(0.0, 100.0);
+    
+    // 2. Confluence Components & Signals (50%)
+    double confScore = s.confluence.toDouble(); // 0 to 100
+    final String sig = s.signal.toUpperCase();
+    if (sig.contains('SELL')) {
+      confScore = 100.0 - confScore; // Bearish, invert to map on low scale
+    } else if (!sig.contains('BUY')) {
+      confScore = 50.0; // Neutral 
+    }
+    
+    return (pcrScore * 0.5) + (confScore * 0.5);
+  }
+
   void _phase2and3() {
     final date = _selectedDate;
     if (date == null) return;
@@ -531,14 +551,15 @@ class _TradingDashboardState extends State<TradingDashboard> {
   }
 
   Widget _buildPulseTier() {
-    // 🧮 Calculate Average Market Sentiment Score (0 to 100 based on PCR 0.5 -> 1.5 interval fallback ranges)
+    double nScore = _getCompositeScore('NIFTY');
+    double bScore = _getCompositeScore('BANKNIFTY');
+    double fScore = _getCompositeScore('FINNIFTY');
+    double avgScore = (nScore + bScore + fScore) / 3.0;
+
     double nPcr = _summary['NIFTY']?.pcr ?? 1.0;
     double bPcr = _summary['BANKNIFTY']?.pcr ?? 1.0;
     double fPcr = _summary['FINNIFTY']?.pcr ?? 1.0;
     double avgPcr = (nPcr + bPcr + fPcr) / 3.0;
-    
-    double getScore(double pcr) => (((pcr - 0.5) / 1.0) * 100.0).clamp(0.0, 100.0);
-    double score = getScore(avgPcr);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -561,10 +582,10 @@ class _TradingDashboardState extends State<TradingDashboard> {
                   runSpacing: 40,
                   alignment: WrapAlignment.center,
                   children: [
-                    _SpeedometerGauge(score: score, label: 'AVG PCR: ${avgPcr.toStringAsFixed(2)}'),
-                    _SpeedometerGauge(score: getScore(nPcr), label: 'NIFTY (${nPcr.toStringAsFixed(2)})'),
-                    _SpeedometerGauge(score: getScore(bPcr), label: 'BANKNIFTY (${bPcr.toStringAsFixed(2)})'),
-                    _SpeedometerGauge(score: getScore(fPcr), label: 'FINNIFTY (${fPcr.toStringAsFixed(2)})'),
+                    _SpeedometerGauge(score: avgScore, label: 'AVG PCR: ${avgPcr.toStringAsFixed(2)}'),
+                    _SpeedometerGauge(score: nScore, label: 'NIFTY (${nPcr.toStringAsFixed(2)})'),
+                    _SpeedometerGauge(score: bScore, label: 'BANKNIFTY (${bPcr.toStringAsFixed(2)})'),
+                    _SpeedometerGauge(score: fScore, label: 'FINNIFTY (${fPcr.toStringAsFixed(2)})'),
                   ],
                 ),
               ],
@@ -685,6 +706,49 @@ class _GlobalSignalsBar extends StatelessWidget {
     if (bullish) { conf = "BULLISH CONFLUENCE 🟢"; confColor = kGreen; }
     else if (bearish) { conf = "BEARISH CONFLUENCE 🔴"; confColor = kRed; }
 
+    final double width = MediaQuery.of(context).size.width;
+    final bool isSmall = width < 600;
+
+    if (isSmall) {
+      return Container(
+        padding: const EdgeInsets.all(8),
+        decoration: const BoxDecoration(
+          color: Colors.transparent, 
+          border: Border(bottom: BorderSide(color: Colors.white10, width: 0.5)),
+        ),
+        child: Column(
+          children: [
+            Row(children: [
+              Expanded(child: _SignalCard(symbol: 'NIFTY', accent: kNifty, summary: summary['NIFTY'])),
+              const SizedBox(width: 8),
+              Expanded(child: _SignalCard(symbol: 'BANKNIFTY', accent: kBank, summary: summary['BANKNIFTY'])),
+            ]),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: _SignalCard(symbol: 'FINNIFTY', accent: Colors.purple, summary: summary['FINNIFTY'])),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  height: 30,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: confColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: confColor.withOpacity(0.3), width: 1.0)
+                  ),
+                  child: Center(
+                    child: FittedBox(
+                      child: Text(conf, style: TextStyle(color: confColor, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5))
+                    )
+                  ),
+                )
+              ),
+            ])
+          ],
+        ),
+      );
+    }
+
     return Container(
       height: 40,
       decoration: const BoxDecoration(
@@ -697,7 +761,6 @@ class _GlobalSignalsBar extends StatelessWidget {
           children: [
             Expanded(child: _SignalCard(symbol: 'NIFTY', accent: kNifty, summary: summary['NIFTY'])),
             Expanded(child: _SignalCard(symbol: 'BANKNIFTY', accent: kBank, summary: summary['BANKNIFTY'])),
-            
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
@@ -705,12 +768,8 @@ class _GlobalSignalsBar extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: confColor.withOpacity(0.3), width: 1.0)
               ),
-              child: Text(
-                conf,
-                style: TextStyle(color: confColor, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-              ),
+              child: Text(conf, style: TextStyle(color: confColor, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
             ),
-
             Expanded(child: _SignalCard(symbol: 'FINNIFTY', accent: Colors.purple, summary: summary['FINNIFTY'])),
           ],
         ),
