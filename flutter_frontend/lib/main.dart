@@ -2237,8 +2237,15 @@ class _SpeedometerGauge extends StatelessWidget {
       children: [
         SizedBox(
           width: 180, height: 100,
-          child: CustomPaint(
-            painter: _GaugePainter(score: score),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0, end: score),
+            duration: const Duration(milliseconds: 1200),
+            curve: Curves.easeOutBack,
+            builder: (context, animValue, child) {
+              return CustomPaint(
+                painter: _GaugePainter(score: animValue),
+              );
+            },
           ),
         ),
         const SizedBox(height: 12),
