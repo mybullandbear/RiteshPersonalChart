@@ -11,18 +11,17 @@ content_no_str = re.sub(r"'(.*?)'", "''", content_no_str)
 # Split back to lines
 lines = content_no_str.split('\n')
 
-current_paren = 0
-for i, line in enumerate(lines):
-    if "//" in line:
-        continue
-    o_p = line.count('(')
-    c_p = line.count(')')
-    current_paren += (o_p - c_p)
-    
-    if current_paren < 0:
-         print(f"🔴 UNDERFLOW AT LINE {i+1}: Paren level = {current_paren} | Content: {line.strip()}")
-    elif current_paren > 0 and i > 500 and i < 650:
-         print(f"Line {i+1}: Paren level = {current_paren} | Content: {line.strip()}")
+curly_stack = []
 
-print(f"Final Paren Balance = {current_paren}")
+for i, line in enumerate(lines):
+    if "//" in line: continue
+    
+    for char in line:
+        if char == '{':
+            curly_stack.append(i + 1)
+        elif char == '}':
+            if curly_stack:
+                curly_stack.pop()
+
+print("Unclosed '{' on lines:", curly_stack)
 

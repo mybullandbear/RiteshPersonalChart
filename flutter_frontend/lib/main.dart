@@ -947,6 +947,9 @@ class _SignalCardState extends State<_SignalCard> with SingleTickerProviderState
   @override
   void dispose() {
     _anim.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.summary == null) {
