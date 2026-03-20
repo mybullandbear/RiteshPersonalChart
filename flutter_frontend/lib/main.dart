@@ -561,7 +561,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
     double fPcr = _summary['FINNIFTY']?.pcr ?? 1.0;
     double avgPcr = (nPcr + bPcr + fPcr) / 3.0;
 
-    Color glowColor = Colors.transparent;
+    Color glowColor = Colors.blueGrey;
     if (avgScore > 65) glowColor = kGreen;
     else if (avgScore < 35) glowColor = kRed;
 
@@ -679,7 +679,10 @@ class _TradingDashboardState extends State<TradingDashboard> {
         if (oi.peOi > maxP) { maxP = oi.peOi; sup = oi.strikePrice; }
       }
 
-      if (spot > 0 && res > 0 && sup > 0) {
+      if (res == 0.0) res = spot + 100.0;
+      if (sup == 0.0) sup = spot - 100.0;
+
+      if (spot > 0) {
         widgets.add(
           _BarrierSlider(
             symbol: sym, spot: spot, support: sup, resistance: res,

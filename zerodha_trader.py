@@ -19,7 +19,7 @@ class PaperTrader:
         
     def load_trading_state(self):
         default_state = {
-            "trading_enabled": False,
+            "trading_enabled": True,
             "paper_trading": True, # Force reality
             "positions": {
                 "NIFTY": None,
