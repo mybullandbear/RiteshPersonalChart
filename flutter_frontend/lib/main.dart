@@ -580,6 +580,11 @@ class _TradingDashboardState extends State<TradingDashboard> {
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
+          // ⚡ Triple Index Confluence Alignment
+          _TripleIndexConfluence(summary: _summary),
+          
+          const SizedBox(height: 24),
+
           Container(
             padding: const EdgeInsets.all(24),
             width: double.infinity,
@@ -606,11 +611,6 @@ class _TradingDashboardState extends State<TradingDashboard> {
               ],
             ),
           ),
-          const SizedBox(height: 24),
-
-          // ⚡ Triple Index Confluence Alignment
-          _TripleIndexConfluence(summary: _summary),
-          
           const SizedBox(height: 24),
           
           // 🎫 Strategy Banner Card
@@ -677,6 +677,14 @@ class _TradingDashboardState extends State<TradingDashboard> {
       for (final oi in list) {
         if (oi.ceOi > maxC) { maxC = oi.ceOi; res = oi.strikePrice; }
         if (oi.peOi > maxP) { maxP = oi.peOi; sup = oi.strikePrice; }
+      }
+
+      final summaryForSym = _summary[sym];
+      if (res == 0.0 && summaryForSym != null && summaryForSym.highCeStrike != null && summaryForSym.highCeStrike! > 0) {
+         res = summaryForSym.highCeStrike!;
+      }
+      if (sup == 0.0 && summaryForSym != null && summaryForSym.highPeStrike != null && summaryForSym.highPeStrike! > 0) {
+         sup = summaryForSym.highPeStrike!;
       }
 
       if (res == 0.0) res = spot + 100.0;
@@ -974,56 +982,6 @@ class _SignalCardState extends State<_SignalCard> with SingleTickerProviderState
         return Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              // Tiny Indicator
-              Container(
-                width: 3, height: 14,
-                decoration: BoxDecoration(
-                  color: sc, borderRadius: BorderRadius.circular(2),
-                  boxShadow: [if (isStrongSignal) BoxShadow(color: sc.withOpacity(0.6), blurRadius: 4)]
-                ),
-              ),
-              const SizedBox(width: 8),
-              
-              // Symbol (Tiny weight)
-              Text(widget.symbol == 'BANKNIFTY' ? 'BNF' : 'NFT', 
-                style: TextStyle(color: widget.accent, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-              const SizedBox(width: 8),
-              
-              // Signal
-              Text(mainWord, style: TextStyle(color: sc, fontSize: 12, fontWeight: FontWeight.w900)),
-              
-              const Spacer(),
-              
-              // Strike Suggestion
-              if (widget.summary!.suggestedStrike != null) ...[
-                Text('🎯 ${widget.summary!.suggestedStrike!.toStringAsFixed(0)}', 
-                  style: const TextStyle(color: Colors.amberAccent, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-                const SizedBox(width: 8),
-              ],
-              
-              // Spot
-              Text(NumberFormat('#,##0').format(widget.summary!.spot), 
-                style: kMono.copyWith(fontSize: 10, color: Colors.white60, fontWeight: FontWeight.normal)),
-              
-              if (isStrongSignal) ...[
-                const SizedBox(width: 8),
-                Material(
-                  color: sc,
-                  borderRadius: BorderRadius.circular(4),
-                  child: InkWell(
-                    onTap: widget.summary!.atm == null ? null : () async {
-                       playAlertSound();
-                       final success = await ApiService().executeTrade(widget.symbol, sig, widget.summary!.atm!);
-                       if (mounted) {
-                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                           backgroundColor: success ? kGreen : kRed,
-                           content: Text('${widget.symbol} $mainWord EXECUTED', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 10))
-                         ));
-                       }
                     },
                     child: const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),

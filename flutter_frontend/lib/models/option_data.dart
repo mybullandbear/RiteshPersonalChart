@@ -13,12 +13,14 @@ class QuickSummary {
   final int? atmCeOi;
   final int? atmPeOi;
   final String? exitAlert;
+  final double? highCeStrike;
+  final double? highPeStrike;
 
   QuickSummary({required this.spot, required this.timestamp,
     required this.signal, required this.color, required this.atm,
     required this.ceOi, required this.peOi, required this.pcr,
     this.nearPcr, required this.confluence, this.suggestedStrike,
-    this.atmCeOi, this.atmPeOi, this.exitAlert});
+    this.atmCeOi, this.atmPeOi, this.exitAlert, this.highCeStrike, this.highPeStrike});
 
   factory QuickSummary.fromJson(Map<String, dynamic> j) => QuickSummary(
     spot:      (j['spot'] ?? 0).toDouble(),
@@ -35,6 +37,8 @@ class QuickSummary {
     atmCeOi:   j['atm_ce_oi']?.toInt(),
     atmPeOi:   j['atm_pe_oi']?.toInt(),
     exitAlert: j['exit_alert'],
+    highCeStrike: j['high_ce_strike']?.toDouble(),
+    highPeStrike: j['high_pe_strike']?.toDouble(),
   );
 }
 

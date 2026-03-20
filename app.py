@@ -827,6 +827,10 @@ def quick_summary():
                 except:
                     pass
 
+            # High OI Strikes fallback Support/Resistance
+            high_ce = max(rows, key=lambda x: x.ce_oi or 0, default=None)
+            high_pe = max(rows, key=lambda x: x.pe_oi or 0, default=None)
+
             result[sym] = {
                 'spot':      spot_price,
                 'timestamp': ts.strftime('%H:%M:%S'),
@@ -841,7 +845,9 @@ def quick_summary():
                 'suggested_strike': suggested_strike,
                 'atm_ce_oi': atm.ce_oi if atm else 0,
                 'atm_pe_oi': atm.pe_oi if atm else 0,
-                'exit_alert': exit_alert
+                'exit_alert': exit_alert,
+                'high_ce_strike': high_ce.strike_price if high_ce else 0,
+                'high_pe_strike': high_pe.strike_price if high_pe else 0,
             }
             
             # Auto Trading & PnL Updates
