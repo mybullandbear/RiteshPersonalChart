@@ -562,16 +562,19 @@ class _TradingDashboardState extends State<TradingDashboard> {
     double avgPcr = (nPcr + bPcr + fPcr) / 3.0;
 
     Color glowColor = Colors.transparent;
-    if (avgScore > 65) glowColor = kGreen.withOpacity(0.06);
-    else if (avgScore < 35) glowColor = kRed.withOpacity(0.06);
+    if (avgScore > 65) glowColor = kGreen;
+    else if (avgScore < 35) glowColor = kRed;
 
-    return Container(
-      decoration: BoxDecoration(
-        gradient: RadialGradient(
-          colors: [glowColor, Colors.transparent],
-          center: Alignment.topCenter, radius: 1.2
-        )
-      ),
+    String strategyText = "STRATEGY: NEUTRAL (Range)";
+    Color strategyColor = Colors.amber;
+    if (avgScore > 65) { strategyText = "STRATEGY: SELL PUT / BUY CE"; strategyColor = kGreen; }
+    else if (avgScore < 35) { strategyText = "STRATEGY: SELL CALL / BUY PE"; strategyColor = kRed; }
+
+    final double width = MediaQuery.of(context).size.width;
+    final bool isSmall = width < 900;
+
+    return _BreathingBackdrop(
+      color: glowColor,
       child: SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -593,7 +596,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
                   runSpacing: 40,
                   alignment: WrapAlignment.center,
                   children: [
-                    _SpeedometerGauge(score: avgScore, label: 'AVG PCR: ${avgPcr.toStringAsFixed(2)}'),
+                    _SpeedometerGauge(score: avgScore, label: 'AVG Composite: ${avgPcr.toStringAsFixed(2)}'),
                     _SpeedometerGauge(score: nScore, label: 'NIFTY (${nPcr.toStringAsFixed(2)})'),
                     _SpeedometerGauge(score: bScore, label: 'BANKNIFTY (${bPcr.toStringAsFixed(2)})'),
                     _SpeedometerGauge(score: fScore, label: 'FINNIFTY (${fPcr.toStringAsFixed(2)})'),
@@ -603,6 +606,43 @@ class _TradingDashboardState extends State<TradingDashboard> {
             ),
           ),
           const SizedBox(height: 24),
+          
+          // 🎫 Strategy Banner Card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              color: strategyColor.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: strategyColor.withOpacity(0.4), width: 1.5)
+            ),
+            child: Center(
+              child: Text(
+                strategyText,
+                style: TextStyle(color: strategyColor, fontSize: 13, fontWeight: FontWeight.black, letterSpacing: 1.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // 🥊 ATM Battleground (Responsively grid stacked)
+          isSmall 
+          ? Column(
+              children: [
+                _AtmBattleground(summary: _summary['NIFTY'], symbol: 'NIFTY'),
+                const SizedBox(height: 16),
+                _AtmBattleground(summary: _summary['BANKNIFTY'], symbol: 'BANKNIFTY'),
+              ],
+            )
+          : Row(
+              children: [
+                Expanded(child: _AtmBattleground(summary: _summary['NIFTY'], symbol: 'NIFTY')),
+                const SizedBox(width: 16),
+                Expanded(child: _AtmBattleground(summary: _summary['BANKNIFTY'], symbol: 'BANKNIFTY')),
+              ],
+            ),
+          const SizedBox(height: 24),
+
           if (_mtfTrend != null) _MTF_Matrix(mtfTrend: _mtfTrend!),
           const SizedBox(height: 24),
           _OIBuildUpHeatmap(
@@ -2312,7 +2352,130 @@ class _GaugePainter extends CustomPainter {
   }
 
   @override
+  @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+// ─── ATM BATTLEGROUND: STRADDLE FIGHTS ──────────────────────────
+class _AtmBattleground extends StatelessWidget {
+  final QuickSummary? summary;
+  final String symbol;
+  const _AtmBattleground({required this.summary, required this.symbol});
+
+  @override
+  Widget build(BuildContext context) {
+    if (summary == null || summary!.atm == null) return const SizedBox();
+
+    double ceOi = (summary!.atmCeOi ?? 0) / 1000.0; 
+    double peOi = (summary!.atmPeOi ?? 0) / 1000.0; 
+    
+    double total = ceOi + peOi;
+    double fillRatio = total > 0 ? ceOi / total : 0.5;
+
+    bool bearsLeading = ceOi > peOi;
+    double diff = (ceOi - peOi).abs();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kSurface.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.04))
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+               const Text('ATM BATTLEGROUND', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+               Container(
+                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                 decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+                 child: Text('${summary!.atm!.toStringAsFixed(0)} STRADDLE', style: const TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+               ),
+            ]
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                 const Text('CALL WRITERS (Resistance)', style: TextStyle(color: kRed, fontSize: 10)),
+                 Text('${ceOi.toStringAsFixed(1)}k', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+              ]),
+              Container(padding: const EdgeInsets.all(6), decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white10), child: const Text('VS', style: TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.bold))),
+              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                 const Text('PUT WRITERS (Support)', style: TextStyle(color: kGreen, fontSize: 10)),
+                 Text('${peOi.toStringAsFixed(1)}k', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+              ]),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Split Progress Bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: SizedBox(
+              height: 8,
+              child: Row(
+                children: [
+                  Expanded(flex: (fillRatio * 100).round() == 0 ? 1 : (fillRatio * 100).round(), child: Container(color: kRed)),
+                  Expanded(flex: ((1 - fillRatio) * 100).round() == 0 ? 1 : ((1 - fillRatio) * 100).round(), child: Container(color: kGreen)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            bearsLeading ? 'BEARS LEADING by ${diff.toStringAsFixed(1)}k contracts' : 'BULLS LEADING by ${diff.toStringAsFixed(1)}k contracts',
+            style: TextStyle(color: bearsLeading ? kRed : kGreen, fontSize: 11, fontWeight: FontWeight.bold),
+          )
+        ],
+      )
+    );
+  }
+}
+
+// ─── BREATHING BACKDROP ANIMATION ──────────────────────────────
+class _BreathingBackdrop extends StatefulWidget {
+  final Widget child;
+  final Color color;
+  const _BreathingBackdrop({required this.child, required this.color});
+
+  @override
+  State<_BreathingBackdrop> createState() => _BreathingBackdropState();
+}
+
+class _BreathingBackdropState extends State<_BreathingBackdrop> with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _glow;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(seconds: 4))..repeat(reverse: true);
+    _glow = Tween<double>(begin: 0.02, end: 0.08).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _glow,
+      builder: (context, child) {
+        return Container(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              colors: [widget.color.withOpacity(_glow.value), Colors.transparent],
+              center: Alignment.topCenter, radius: 1.3
+            )
+          ),
+          child: widget.child,
+        );
+      }
+    );
+  }
 }
 
 class _BarrierSlider extends StatelessWidget {

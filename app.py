@@ -839,6 +839,8 @@ def quick_summary():
                 'near_pcr':  near_pcr,
                 'confluence': confluence,
                 'suggested_strike': suggested_strike,
+                'atm_ce_oi': atm.ce_oi if atm else 0,
+                'atm_pe_oi': atm.pe_oi if atm else 0,
                 'exit_alert': exit_alert
             }
             
