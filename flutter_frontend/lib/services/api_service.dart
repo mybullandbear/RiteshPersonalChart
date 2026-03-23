@@ -144,4 +144,12 @@ class ApiService {
     }
     throw Exception('logs failed');
   }
+
+  Future<Map<String, dynamic>> getMarketExtras() async {
+    final r = await http.get(Uri.parse('$_base/market_extras')).timeout(_fast);
+    if (r.statusCode == 200) {
+      return json.decode(r.body) as Map<String, dynamic>;
+    }
+    throw Exception('market_extras failed');
+  }
 }

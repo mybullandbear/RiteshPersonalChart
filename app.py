@@ -959,6 +959,19 @@ def trigger_backtest():
     except Exception as e:
           return jsonify({"error": str(e)}), 500
 
+@app.route('/api/market_extras')
+def get_market_extras():
+    """Returns IndiaVIX and Heavyweights data from json file"""
+    try:
+        import os, json
+        filepath = os.path.join("data", "market_extras.json")
+        if os.path.exists(filepath):
+             with open(filepath, 'r') as f:
+                  return jsonify(json.load(f))
+        return jsonify({"vix": 0.0, "vix_change": 0.0, "heavyweights": []})
+    except Exception as e:
+         return jsonify({"error": str(e)}), 500
+
 @app.route('/api/logs')
 def get_logs():
     """Fetch the last 40 lines of bot_log.txt"""

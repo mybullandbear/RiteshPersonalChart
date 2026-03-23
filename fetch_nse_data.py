@@ -310,6 +310,49 @@ def is_market_open():
     end_time = datetime.strptime("15:30", "%H:%M").time()
     return start_time <= current_time <= end_time
 
+def update_market_extras():
+    """Fetches IndiaVIX and Top 5 Heavyweights using yfinance and saves to JSON."""
+    try:
+        import yfinance as yf
+        tickers = ['^INDIAVIX', 'RELIANCE.NS', 'HDFCBANK.NS', 'ICICIBANK.NS', 'INFY.NS', 'TCS.NS']
+        data = yf.download(tickers, period='1d', interval='1m', progress=False)
+        
+        if data.empty: return
+        
+        extras = {
+            "timestamp": datetime.now().strftime("%H:%M:%S"),
+            "vix": 0.0, "vix_change": 0.0,
+            "heavyweights": []
+        }
+        
+        # 1. India VIX
+        if '^INDIAVIX' in data.columns.get_level_values(1):
+            vix_series = data['Close']['^INDIAVIX'].dropna()
+            if not vix_series.empty:
+                extras["vix"] = round(float(vix_series.iloc[-1]), 2)
+                if len(vix_series) > 1:
+                     prev = float(vix_series.iloc[-2])
+                     extras["vix_change"] = round(((extras["vix"] - prev) / prev) * 100, 2)
+        
+        # 2. Heavyweights
+        weights = { 'RELIANCE.NS': 10.4, 'HDFCBANK.NS': 11.6, 'ICICIBANK.NS': 7.8, 'INFY.NS': 6.2, 'TCS.NS': 4.5 }
+        for t, wt in weights.items():
+            if t in data.columns.get_level_values(1):
+                price_series = data['Close'][t].dropna()
+                if not price_series.empty:
+                    curr = float(price_series.iloc[-1])
+                    prev = float(price_series.iloc[-2]) if len(price_series) > 1 else curr
+                    chg = round(((curr - prev) / prev) * 100, 2) if prev > 0 else 0.0
+                    extras["heavyweights"].append({
+                        "symbol": t.replace(".NS",""), "price": round(curr, 2), "change": chg, "weight": wt
+                    })
+                    
+        with open(os.path.join(DATA_DIR, "market_extras.json"), 'w') as f:
+            json.dump(extras, f)
+        print("[Market Extras] IndiaVIX and Heavyweights saved.", flush=True)
+    except Exception as e:
+        print(f"[Market Extras] Error: {e}", flush=True)
+
 def job(force=False):
     if not force and not is_market_open():
         print(f"Market closed. Skipping at {datetime.now().strftime('%H:%M:%S')}")
@@ -317,6 +360,8 @@ def job(force=False):
 
     try:
         print(f"--- Starting Fetch Job at {datetime.now().strftime('%H:%M:%S')} ---", flush=True)
+        try: update_market_extras() 
+        except: pass
         links = load_links()
 
         for symbol in INDICES:

@@ -107,6 +107,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
   bool _phase1Loading = false;
   Map<String, dynamic>? _mtfTrend;
   Future<Map<String, dynamic>>? _tradingStateFuture;
+  Map<String, dynamic> _marketExtras = {};
 
   @override
   void initState() {
@@ -166,6 +167,10 @@ class _TradingDashboardState extends State<TradingDashboard> {
     _phase1Loading = true;
     try {
       final s = await _api.getQuickSummary(_selectedDate);
+      try {
+         final extras = await _api.getMarketExtras();
+         _marketExtras = extras;
+      } catch(_) {}
       
       for (final sym in s.keys) {
          final newSig = s[sym]?.signal ?? '';
@@ -612,6 +617,66 @@ class _TradingDashboardState extends State<TradingDashboard> {
     return _buildCommandHubTier();
   }
 
+  Widget _buildMarketExtrasBar() {
+    final double vix = _marketExtras['vix']?.toDouble() ?? 0.0;
+    final double vixChg = _marketExtras['vix_change']?.toDouble() ?? 0.0;
+    final List<dynamic> heavy = _marketExtras['heavyweights'] ?? [];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: kSurface.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(children: [
+                const Icon(Icons.analytics_outlined, color: Colors.purpleAccent, size: 20),
+                const SizedBox(width: 8),
+                const Text('INDIA VIX', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+                const SizedBox(width: 12),
+                Text('$vix', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
+                const SizedBox(width: 6),
+                Text(vixChg >= 0 ? '+$vixChg%' : '$vixChg%', style: TextStyle(color: vixChg >= 0 ? kRed : kGreen, fontSize: 12, fontWeight: FontWeight.bold)), 
+              ]),
+              const Text('HEAVYWEIGHTS DRIVERS ⚖️', style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          if (heavy.isNotEmpty) ...[
+             const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(color: Colors.white10, height: 1)),
+             SingleChildScrollView(
+               scrollDirection: Axis.horizontal,
+               physics: const BouncingScrollPhysics(),
+               child: Row(
+                 children: heavy.map<Widget>((h) {
+                    final double chg = h['change']?.toDouble() ?? 0.0;
+                    final String sym = h['symbol'] ?? '';
+                    final double wt = h['weight']?.toDouble() ?? 0.0;
+                    return Container(
+                       margin: const EdgeInsets.only(right: 12),
+                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                       decoration: BoxDecoration(color: Colors.white.withOpacity(0.03), borderRadius: BorderRadius.circular(8)),
+                       child: Row(children: [
+                          Text(sym, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12)),
+                          const SizedBox(width: 6),
+                          Text(chg >= 0 ? '+$chg%' : '$chg%', style: TextStyle(color: chg >= 0 ? kGreen : kRed, fontWeight: FontWeight.w800, fontSize: 12)),
+                          const SizedBox(width: 4),
+                          Text('(${wt}%)', style: const TextStyle(color: Colors.white24, fontSize: 10)),
+                       ]),
+                    );
+                 }).toList(),
+               ),
+             )
+          ]
+        ],
+      )
+    );
+  }
+
   Widget _buildPulseTier() {
     double nScore = _getCompositeScore('NIFTY');
     double bScore = _getCompositeScore('BANKNIFTY');
@@ -644,6 +709,11 @@ class _TradingDashboardState extends State<TradingDashboard> {
         children: [
           // ⚡ Triple Index Confluence Alignment
           _TripleIndexConfluence(summary: _summary),
+          
+          const SizedBox(height: 16),
+          
+          // 📊 India VIX & Heavyweight contribution
+          _buildMarketExtrasBar(),
           
           const SizedBox(height: 24),
 
