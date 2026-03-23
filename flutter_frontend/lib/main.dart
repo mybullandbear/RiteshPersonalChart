@@ -175,13 +175,30 @@ class _TradingDashboardState extends State<TradingDashboard> {
          }
       }
 
-      setState(() {
-        _summary = s;
-        _initialLoading = false;
-        _refreshing = false;
-        _error = null; // Clear error on successful update
-        _lastUpdated = DateTime.now();
-      });
+      bool changed = _summary.isEmpty;
+      if (!changed) {
+         for (final sym in s.keys) {
+            if (_summary[sym]?.spot != s[sym]?.spot || _summary[sym]?.signal != s[sym]?.signal) {
+                changed = true;
+                break;
+            }
+         }
+      }
+
+      if (changed) {
+        setState(() {
+          _summary = s;
+          _initialLoading = false;
+          _refreshing = false;
+          _error = null; 
+          _lastUpdated = DateTime.now();
+        });
+      } else {
+         // Silently update timestamp without heavy layout rebuilds
+         setState(() {
+           _lastUpdated = DateTime.now();
+         });
+      }
     } catch (e) {
       if (mounted) {
         // 🤫 Silent fail for periodic updates so it doesn't break the UI with error screens
@@ -289,6 +306,31 @@ class _TradingDashboardState extends State<TradingDashboard> {
     );
   }
 
+  Future<void> _exportToCSV() async {
+    try {
+       final history = await _api.getTradeHistory();
+       if (history.isEmpty) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No trade history available to export.')));
+          return;
+       }
+       
+       String csv = 'Symbol,Type,Strike,Qty,Entry Price,Exit Price,Profit,Peak Profit,Entry Time,Exit Time,Reason,Snapshot Time\n';
+       for (var row in history) {
+          csv += '${row['symbol']},${row['type']},${row['strike']},${row['quantity']},${row['entry_price']},${row['exit_price']},${row['profit']},${row['highest_profit']},${row['entry_time']},${row['exit_time']},"${row['exit_reason']}","${row['snapshot_timestamp']}"\n';
+       }
+       
+       final bytes = csv.codeUnits;
+       final blob = html.Blob([bytes]);
+       final url = html.Url.createObjectUrlFromBlob(blob);
+       final anchor = html.AnchorElement(href: url)
+         ..setAttribute("download", "trade_history_${DateTime.now().millisecondsSinceEpoch}.csv")
+         ..click();
+       html.Url.revokeObjectUrl(url);
+    } catch (e) {
+       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export Failed: $e')));
+    }
+  }
+
   Widget _buildCommandHubTier() {
     return FutureBuilder<Map<String, dynamic>>(
       future: _api.getTradingState(),
@@ -347,17 +389,35 @@ class _TradingDashboardState extends State<TradingDashboard> {
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.blueAccent, width: 1.5),
-                    padding: const EdgeInsets.all(16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: () {
-                     _showTradeHistory(context);
-                  },
-                  icon: const Icon(Icons.history, color: Colors.blueAccent),
-                  label: const Text('VIEW TRADE HISTORY LEDGER', style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.w900)),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.blueAccent, width: 1.5),
+                          padding: const EdgeInsets.all(16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () { _showTradeHistory(context); },
+                        icon: const Icon(Icons.history, color: Colors.blueAccent),
+                        label: const Text('VIEW HISTORY', style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 13)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.withOpacity(0.1),
+                          side: const BorderSide(color: Colors.greenAccent, width: 1.0),
+                          padding: const EdgeInsets.all(16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _exportToCSV,
+                        icon: const Icon(Icons.download, color: Colors.greenAccent),
+                        label: const Text('EXPORT CSV', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 13)),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 24),
