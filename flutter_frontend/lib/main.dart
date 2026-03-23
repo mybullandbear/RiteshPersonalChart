@@ -106,10 +106,12 @@ class _TradingDashboardState extends State<TradingDashboard> {
   int _activeTabIndex = 0; // 0 = Market Pulse, 1 = Index Analytics
   bool _phase1Loading = false;
   Map<String, dynamic>? _mtfTrend;
+  Future<Map<String, dynamic>>? _tradingStateFuture;
 
   @override
   void initState() {
     super.initState();
+    _tradingStateFuture = ApiService().getTradingState();
     
     // 🔒 Persistent Login Check
     try {
@@ -333,7 +335,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
 
   Widget _buildCommandHubTier() {
     return FutureBuilder<Map<String, dynamic>>(
-      future: _api.getTradingState(),
+      future: _tradingStateFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
            return const SizedBox(height: 300, child: Center(child: CircularProgressIndicator()));
@@ -368,7 +370,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
                       activeColor: Colors.amber,
                       onChanged: (val) async {
                          await _api.toggleTradingConfig(paperTrading: val);
-                         setState((){});
+                         setState(() { _tradingStateFuture = _api.getTradingState(); });
                       }
                     ),
                     const Divider(color: Colors.white10),
@@ -379,7 +381,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
                       activeColor: Colors.blueAccent,
                       onChanged: (val) async {
                          await _api.toggleTradingConfig(tradingEnabled: val);
-                         setState((){});
+                         setState(() { _tradingStateFuture = _api.getTradingState(); });
                       }
                     ),
                   ]

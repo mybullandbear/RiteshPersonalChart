@@ -854,17 +854,30 @@ def quick_summary():
             try:
                 from zerodha_trader import trader
                 
-                # Fetch realistic option price for the ATM string
+                # 🎯 Strike Selection: ATM or OTM
+                strike_sel = "ATM"
+                try:
+                    with open("config.json", 'r') as f:
+                        strike_sel = json.load(f).get("STRIKE_SELECTION", "ATM")
+                except: pass
+
+                exec_strike = atm.strike_price if atm else 0
+                if strike_sel == "OTM" and suggested_strike:
+                    exec_strike = suggested_strike
+
+                # Fetch realistic option price for the EXECUTION strike
                 opt_price = 0
-                if atm and ('BUY' in signal or 'SELL' in signal) and 'BOTH' not in signal:
-                     if "CE" in signal or "CALL" in signal or "Bearish" in signal:
-                         opt_price = atm.ce_last_price or 0
-                     elif "PE" in signal or "PUT" in signal or "Bullish" in signal:
-                         opt_price = atm.pe_last_price or 0
-                         
+                if exec_strike > 0:
+                     exec_row = next((r for r in rows if r.strike_price == exec_strike), atm)
+                     if exec_row and ('BUY' in signal or 'SELL' in signal) and 'BOTH' not in signal:
+                          if "CE" in signal or "CALL" in signal or "Bearish" in signal:
+                              opt_price = exec_row.ce_last_price or 0
+                          elif "PE" in signal or "PUT" in signal or "Bullish" in signal:
+                              opt_price = exec_row.pe_last_price or 0
+                          
                 signal_data = {
                     'signal': signal,
-                    'atm': atm.strike_price if atm else 0,
+                    'atm': exec_strike, # Passes OTM if configured
                     'atm_option_price': opt_price,
                     'ts_of_row': ts.strftime('%Y-%m-%d %H:%M:%S')
                 }
@@ -933,6 +946,18 @@ def get_trade_history():
         return jsonify([])
     except Exception as e:
          return jsonify({"error": str(e)}), 500
+
+@app.route('/api/backtest')
+def trigger_backtest():
+    """Runs a Simulation backtest for a specific symbol & date range"""
+    try:
+         symbol = request.args.get('symbol', 'NIFTY')
+         days = int(request.args.get('days', 5))
+         from backtest_engine import run_backtest
+         stats = run_backtest(symbol=symbol, lookback_days=days)
+         return jsonify(stats)
+    except Exception as e:
+          return jsonify({"error": str(e)}), 500
 
 @app.route('/api/logs')
 def get_logs():

@@ -136,19 +136,27 @@ class PaperTrader:
         self.save_trading_state(state)
         
         # 🚀 Risk Management Overrides
-        stop_loss_limit = 1500 # Absolute value
+        sl_pct = 0.50 # 50% max loss limit on premium
         try:
             with open("config.json", 'r') as f:
-                stop_loss_limit = json.load(f).get("STOP_LOSS", 1500)
+                sl_pct = json.load(f).get("STOP_LOSS_PCT", 50) / 100.0
         except: pass
 
-        # 1. Hard Stop-Loss Guard (Loss limit hit)
-        if current_profit <= -abs(stop_loss_limit):
-            print(f"[{symbol}] HARD STOP LOSS HIT (₹{current_profit:,.2f})! Exiting Position...")
-            self.exit_position(symbol, reason=f"Hard Stop-Loss (₹{stop_loss_limit})")
+        # 1. Dynamic Stop-Loss Guard (% of Premium sold)
+        max_loss_allowed = entry_price * sl_pct * quantity
+        if current_profit <= -abs(max_loss_allowed):
+            print(f"[{symbol}] DYNAMIC SL HIT (₹{current_profit:,.2f})! Exiting Position...")
+            self.exit_position(symbol, reason=f"Dynamic SL ({int(sl_pct*100)}%)")
             return
 
-        # 2. Existing Trailing SL 
+        # 2. Break-Even Safeguard (Protects setup after 30% decay reached)
+        max_profit = entry_price * quantity
+        if highest_profit >= (max_profit * 0.30) and current_profit <= 0:
+            print(f"[{symbol}] BREAK-EVEN HIT post 30% decay! Position closed at cost.")
+            self.exit_position(symbol, reason="Break-Even Protection")
+            return
+
+        # 3. Existing Trailing SL 
         if highest_profit >= 3000 and current_profit <= 2000:
             print(f"[{symbol}] Trailing SL Hit in Paper Trade! Exiting...")
             self.exit_position(symbol, reason="Trailing SL (Peak ₹3000 -> Pullback ₹2000)")
