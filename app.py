@@ -865,7 +865,8 @@ def quick_summary():
                 signal_data = {
                     'signal': signal,
                     'atm': atm.strike_price if atm else 0,
-                    'atm_option_price': opt_price
+                    'atm_option_price': opt_price,
+                    'ts_of_row': ts.strftime('%Y-%m-%d %H:%M:%S')
                 }
                 
                 # Update P&L if we have an active position
@@ -894,7 +895,18 @@ def quick_summary():
                         
                 # Auto Execution Logic
                 is_auto = trader.get_trading_status()
-                if is_auto and not pos and signal != 'NEUTRAL' and signal != 'No Data' and signal != 'WAIT':
+                
+                # ⏰ Market Hours Check: 09:15 to 15:30 IST weekdays
+                from datetime import time, datetime
+                is_market_hours = False
+                try:
+                    is_market_hours = (ts.date() == datetime.now().date() and 
+                                      ts.weekday() < 5 and # 0=Mon, 4=Fri
+                                      time(9, 15) <= ts.time() <= time(15, 30))
+                except Exception as e:
+                    print("Error checking market hours:", e)
+
+                if is_auto and not pos and is_market_hours and signal not in ['NEUTRAL', 'No Data', 'WAIT']:
                      # Execute automatically if confluence is high
                      if confluence >= 70:
                           trader.execute_trade(signal_data, sym, "AUTO", reason=f"Aggregated Signal ({signal}) Confluence {confluence}%")

@@ -108,6 +108,7 @@ class PaperTrader:
             "highest_profit": 0,
             "current_profit": 0,
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "snapshot_timestamp": signal_data.get('ts_of_row', "N/A"),
             "entry_reason": reason
         }
         self.save_trading_state(state)
@@ -173,7 +174,8 @@ class PaperTrader:
             "entry_time": pos.get("timestamp", ""),
             "exit_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "entry_reason": pos.get("entry_reason", "Auto Signal"),
-            "exit_reason": exit_reason
+            "exit_reason": exit_reason,
+            "snapshot_timestamp": pos.get("snapshot_timestamp", "N/A")
         }
         history.append(trade_entry)
         try:
