@@ -2,14 +2,14 @@ import json
 import os
 from datetime import datetime
 
-TRADING_STATE_FILE = "trading_state.json"
+TRADING_STATE_FILE = "data/trading_state.json"
 
 def log_message(msg):
     """Appends live status stream to bot_log.txt"""
     try:
         from datetime import datetime
         timestamp = datetime.now().strftime('%H:%M:%S')
-        with open('bot_log.txt', 'a') as f:
+        with open('data/bot_log.txt', 'a') as f:
             f.write(f"[{timestamp}] {msg}\n")
     except: pass
 
@@ -155,7 +155,7 @@ class PaperTrader:
             
     def log_trade_history(self, pos, exit_price, exit_reason):
         """Saves trade to trade_history.json"""
-        history_file = "trade_history.json"
+        history_file = "data/trade_history.json"
         history = []
         if os.path.exists(history_file):
             try:

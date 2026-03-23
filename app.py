@@ -927,8 +927,8 @@ def get_trade_history():
     """Returns contents of trade_history.json"""
     try:
         import os
-        if os.path.exists("trade_history.json"):
-             with open("trade_history.json", 'r') as f:
+        if os.path.exists("data/trade_history.json"):
+             with open("data/trade_history.json", 'r') as f:
                  return jsonify(json.load(f))
         return jsonify([])
     except Exception as e:
@@ -939,9 +939,9 @@ def get_logs():
     """Fetch the last 40 lines of bot_log.txt"""
     try:
         import os
-        if not os.path.exists('bot_log.txt'):
+        if not os.path.exists('data/bot_log.txt'):
              return jsonify({"success": True, "logs": ["[System] Logs initialized."] })
-        with open('bot_log.txt', 'r') as f:
+        with open('data/bot_log.txt', 'r') as f:
              lines = f.readlines()[-40:]
         lines = [l.strip() for l in lines]
         return jsonify({"success": True, "logs": lines})
