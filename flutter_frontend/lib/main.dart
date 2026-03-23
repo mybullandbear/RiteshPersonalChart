@@ -671,7 +671,42 @@ class _TradingDashboardState extends State<TradingDashboard> {
                  }).toList(),
                ),
              )
-          ]
+          ],
+          
+          // 🔔 Volume Spike Alerts 
+          () {
+            final List<String> allAlerts = [];
+            for (final sym in _summary.keys) {
+               final al = _summary[sym]?.alerts ?? [];
+               for (final a in al) { allAlerts.add('[$sym] $a'); }
+            }
+            if (allAlerts.isEmpty) return const SizedBox.shrink();
+            
+            return Container(
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: Colors.red.withOpacity(0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.redAccent.withOpacity(0.3))),
+              child: Row(
+                children: [
+                   const Icon(Icons.notifications_active, color: Colors.redAccent, size: 16),
+                   const SizedBox(width: 8),
+                   Expanded(
+                     child: SingleChildScrollView(
+                       scrollDirection: Axis.horizontal,
+                       physics: const BouncingScrollPhysics(),
+                       child: Row(
+                         children: allAlerts.map<Widget>((a) => Container(
+                           margin: const EdgeInsets.only(right: 16),
+                           child: Text(a, style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+                         )).toList(),
+                       ),
+                     )
+                   )
+                ],
+              )
+            );
+          }()
+
         ],
       )
     );

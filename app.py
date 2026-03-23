@@ -747,6 +747,32 @@ def quick_summary():
                             OptionChainData.timestamp == ts)
                     .all())
 
+            # 🚨 Volume Spike Alerts Tracker
+            alerts = []
+            try:
+                prev_latest = (session.query(OptionChainData)
+                              .filter(OptionChainData.symbol == sym, OptionChainData.timestamp < ts)
+                              .order_by(OptionChainData.timestamp.desc())
+                              .first())
+                if prev_latest:
+                     prev_ts = prev_latest.timestamp
+                     prev_rows = (session.query(OptionChainData)
+                                 .filter(OptionChainData.symbol == sym, OptionChainData.timestamp == prev_ts)
+                                 .all())
+                     prev_map = {r.strike_price: r for r in prev_rows}
+                     
+                     for r in rows:
+                         p_r = prev_map.get(r.strike_price)
+                         if p_r:
+                              vol_diff_ce = (r.ce_volume or 0) - (p_r.ce_volume or 0)
+                              if vol_diff_ce >= 5000 and vol_diff_ce > (p_r.ce_volume or 0) * 0.15:
+                                  alerts.append(f"CE {int(r.strike_price)} Volume Surge (+{int(vol_diff_ce)})")
+                              vol_diff_pe = (r.pe_volume or 0) - (p_r.pe_volume or 0)
+                              if vol_diff_pe >= 5000 and vol_diff_pe > (p_r.pe_volume or 0) * 0.15:
+                                  alerts.append(f"PE {int(r.strike_price)} Volume Surge (+{int(vol_diff_pe)})")
+            except Exception as ale:
+                 print("Alert Calculation error:", ale)
+
             total_ce_oi = sum(r.ce_oi or 0 for r in rows)
             total_pe_oi = sum(r.pe_oi or 0 for r in rows)
             pcr = round(total_pe_oi / total_ce_oi, 2) if total_ce_oi > 0 else 0
@@ -848,6 +874,7 @@ def quick_summary():
                 'exit_alert': exit_alert,
                 'high_ce_strike': high_ce.strike_price if high_ce else 0,
                 'high_pe_strike': high_pe.strike_price if high_pe else 0,
+                'alerts':    alerts,
             }
             
             # Auto Trading & PnL Updates
