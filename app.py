@@ -634,7 +634,7 @@ def get_signals():
     session = Session()
     
     response = {}
-    symbols = ["NIFTY", "BANKNIFTY", "FINNIFTY"]
+    symbols = ["NIFTY", "BANKNIFTY", "FINNIFTY", "RELIANCE", "HDFCBANK", "ICICIBANK", "INFY", "TCS"]
     
     from datetime import timedelta
     
@@ -727,7 +727,7 @@ def quick_summary():
     """Single fast endpoint: returns spots + latest signals + PCR for both symbols.
     Designed to load in < 1 second for the dashboard header."""
     date_str = request.args.get('date')
-    symbols = ['NIFTY', 'BANKNIFTY', 'FINNIFTY']
+    symbols = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'RELIANCE', 'HDFCBANK', 'ICICIBANK', 'INFY', 'TCS']
     result = {}
 
     # Find latest date if not provided
@@ -1026,10 +1026,11 @@ def quick_summary():
 
 @app.route('/api/oi_histograms')
 def get_oi_histograms():
-    """Returns exact OI changes over 5m, 15m, and 30m intervals."""
+    """Returns OI changes over intervals, defaulting to aggregate, or strike-wise if interval provided."""
     symbol = request.args.get('symbol', 'NIFTY')
     date_str = request.args.get('date')
     time_str = request.args.get('time')
+    interval_val = request.args.get('interval', type=int)
     
     engine = get_db_engine(date_str)
     Session = sessionmaker(bind=engine)
@@ -1045,27 +1046,50 @@ def get_oi_histograms():
         
         latest_ts = latest.timestamp
         latest_rows = session.query(OptionChainData).filter(OptionChainData.symbol == symbol, OptionChainData.timestamp == latest_ts).all()
-        latest_ce = sum(r.ce_oi or 0 for r in latest_rows)
-        latest_pe = sum(r.pe_oi or 0 for r in latest_rows)
         
         from datetime import timedelta
-        intervals = [5, 15, 30]
-        histograms = []
-        for mn in intervals:
-            past_time = latest_ts - timedelta(minutes=mn)
+        
+        if interval_val:
+            # Strike-wise calculation
+            past_time = latest_ts - timedelta(minutes=interval_val)
             past_record = session.query(OptionChainData).filter(OptionChainData.symbol == symbol, OptionChainData.timestamp <= past_time).order_by(OptionChainData.timestamp.desc()).first()
+            
+            strike_data = []
             if past_record:
                 past_rows = session.query(OptionChainData).filter(OptionChainData.symbol == symbol, OptionChainData.timestamp == past_record.timestamp).all()
-                past_ce = sum(r.ce_oi or 0 for r in past_rows)
-                past_pe = sum(r.pe_oi or 0 for r in past_rows)
-                histograms.append({
-                    'interval': f'{mn}m',
-                    'ce_change': latest_ce - past_ce,
-                    'pe_change': latest_pe - past_pe
-                })
-            else:
-                histograms.append({'interval': f'{mn}m', 'ce_change': 0, 'pe_change': 0})
-        return jsonify(histograms)
+                past_map = {r.strike_price: r for r in past_rows}
+                for r in latest_rows:
+                    past_r = past_map.get(r.strike_price)
+                    if past_r:
+                        strike_data.append({
+                            'strike': r.strike_price,
+                            'ce_change': (r.ce_oi or 0) - (past_r.ce_oi or 0),
+                            'pe_change': (r.pe_oi or 0) - (past_r.pe_oi or 0)
+                        })
+            # Sorting strikes for safe rendering
+            return jsonify(sorted(strike_data, key=lambda x: x['strike']))
+
+        else:
+            # Aggregate totals calculation (default behavior)
+            latest_ce = sum(r.ce_oi or 0 for r in latest_rows)
+            latest_pe = sum(r.pe_oi or 0 for r in latest_rows)
+            intervals = [5, 15, 30, 60, 120]
+            histograms = []
+            for mn in intervals:
+                past_time = latest_ts - timedelta(minutes=mn)
+                past_record = session.query(OptionChainData).filter(OptionChainData.symbol == symbol, OptionChainData.timestamp <= past_time).order_by(OptionChainData.timestamp.desc()).first()
+                if past_record:
+                    past_rows = session.query(OptionChainData).filter(OptionChainData.symbol == symbol, OptionChainData.timestamp == past_record.timestamp).all()
+                    past_ce = sum(r.ce_oi or 0 for r in past_rows)
+                    past_pe = sum(r.pe_oi or 0 for r in past_rows)
+                    histograms.append({
+                        'interval': f'{mn}m',
+                        'ce_change': latest_ce - past_ce,
+                        'pe_change': latest_pe - past_pe
+                    })
+                else:
+                    histograms.append({'interval': f'{mn}m', 'ce_change': 0, 'pe_change': 0})
+            return jsonify(histograms)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:

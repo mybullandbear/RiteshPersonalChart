@@ -160,10 +160,11 @@ class ApiService {
     throw Exception('market_extras failed');
   }
 
-  Future<List<dynamic>> getOiHistograms(String symbol, [String? date, String? time]) async {
+  Future<List<dynamic>> getOiHistograms(String symbol, [String? date, String? time, int? interval]) async {
     String url = '$_base/oi_histograms?symbol=$symbol';
     if (date != null) url += '&date=$date';
     if (time != null) url += '&time=$time';
+    if (interval != null) url += '&interval=$interval';
     final r = await http.get(Uri.parse(url)).timeout(_fast);
     if (r.statusCode == 200) {
       return json.decode(r.body) as List<dynamic>;

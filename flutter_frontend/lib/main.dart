@@ -110,6 +110,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
   Map<String, dynamic> _marketExtras = {};
   Map<String, List<dynamic>> _oiHistograms = {};
   Map<String, bool> _oiHistLoading = {};
+  int _histInterval = 15;
   int _playbackMinutes = 930; // 930 = 15:30 (Live). 555 = 09:15.
 
   @override
@@ -252,7 +253,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
       if (mounted) setState(() => _mtfTrend = val);
     }).catchError((_) {});
 
-    for (final sym in ['NIFTY', 'BANKNIFTY', 'FINNIFTY']) {
+    for (final sym in ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'RELIANCE', 'HDFCBANK', 'ICICIBANK', 'INFY', 'TCS']) {
       setState(() { _oiLoading[sym] = true; _oiHistLoading[sym] = true; });
 
       final String? timeStr = _playbackMinutes < 930 ? "${_playbackMinutes ~/ 60}:${(_playbackMinutes % 60).toString().padLeft(2, '0')}" : null;
@@ -264,7 +265,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
         if (mounted) setState(() => _oiLoading[sym] = false);
       });
       
-      _api.getOiHistograms(sym, date, timeStr).then((hist) {
+      _api.getOiHistograms(sym, date, timeStr, _histInterval).then((hist) {
         if (mounted) setState(() { _oiHistograms[sym] = hist; _oiHistLoading[sym] = false; });
       }).catchError((_) {
         if (mounted) setState(() => _oiHistLoading[sym] = false);
@@ -629,6 +630,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
     
     if (_activeTabIndex == 0) return _buildPulseTier();
     if (_activeTabIndex == 1) return _buildAnalyticsTier();
+    if (_activeTabIndex == 2) return _buildHeavyweightsTier();
     return _buildCommandHubTier();
   }
 
@@ -671,6 +673,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
                     final double chg = h['change']?.toDouble() ?? 0.0;
                     final String sym = h['symbol'] ?? '';
                     final double wt = h['weight']?.toDouble() ?? 0.0;
+                    final double price = h['price']?.toDouble() ?? 0.0;
                     return Container(
                        margin: const EdgeInsets.only(right: 12),
                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -678,9 +681,13 @@ class _TradingDashboardState extends State<TradingDashboard> {
                        child: Row(children: [
                           Text(sym, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12)),
                           const SizedBox(width: 6),
+                          if (price > 0) ...[
+                             Text('₹$price', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                             const SizedBox(width: 6),
+                          ],
                           Text(chg >= 0 ? '+$chg%' : '$chg%', style: TextStyle(color: chg >= 0 ? kGreen : kRed, fontWeight: FontWeight.w800, fontSize: 12)),
                           const SizedBox(width: 4),
-                          Text('(${wt}%)', style: const TextStyle(color: Colors.white24, fontSize: 10)),
+                          Text('($wt%)', style: const TextStyle(color: Colors.white24, fontSize: 10)),
                        ]),
                     );
                  }).toList(),
@@ -784,7 +791,6 @@ class _TradingDashboardState extends State<TradingDashboard> {
                   runSpacing: 40,
                   alignment: WrapAlignment.center,
                   children: [
-                    _SpeedometerGauge(score: avgScore, label: 'AVG Composite: ${avgPcr.toStringAsFixed(2)}'),
                     _SpeedometerGauge(score: nScore, label: 'NIFTY (${nPcr.toStringAsFixed(2)})'),
                     _SpeedometerGauge(score: bScore, label: 'BANKNIFTY (${bPcr.toStringAsFixed(2)})'),
                     _SpeedometerGauge(score: fScore, label: 'FINNIFTY (${fPcr.toStringAsFixed(2)})'),
@@ -820,6 +826,8 @@ class _TradingDashboardState extends State<TradingDashboard> {
                 _AtmBattleground(summary: _summary['NIFTY'], symbol: 'NIFTY'),
                 const SizedBox(height: 16),
                 _AtmBattleground(summary: _summary['BANKNIFTY'], symbol: 'BANKNIFTY'),
+                const SizedBox(height: 16),
+                _AtmBattleground(summary: _summary['FINNIFTY'], symbol: 'FINNIFTY'),
               ],
             )
           : Row(
@@ -827,6 +835,8 @@ class _TradingDashboardState extends State<TradingDashboard> {
                 Expanded(child: _AtmBattleground(summary: _summary['NIFTY'], symbol: 'NIFTY')),
                 const SizedBox(width: 16),
                 Expanded(child: _AtmBattleground(summary: _summary['BANKNIFTY'], symbol: 'BANKNIFTY')),
+                const SizedBox(width: 16),
+                Expanded(child: _AtmBattleground(summary: _summary['FINNIFTY'], symbol: 'FINNIFTY')),
               ],
             ),
           const SizedBox(height: 24),
@@ -903,16 +913,19 @@ class _TradingDashboardState extends State<TradingDashboard> {
             _Panel(symbol: 'NIFTY', date: _selectedDate!, accent: kNifty, summary: _summary['NIFTY'],
               oiStats: _oiStats['NIFTY'] ?? [], oiLoading: _oiLoading['NIFTY'] ?? false,
               oiHistograms: _oiHistograms['NIFTY'] ?? [], oiHistLoading: _oiHistLoading['NIFTY'] ?? false,
+              histInterval: _histInterval, onIntervalChanged: (v) { setState((){ _histInterval = v; }); _phase2and3(); },
               border: false, isMobile: true),
             const Divider(color: kBorder, height: 1, thickness: 1.5),
             _Panel(symbol: 'BANKNIFTY', date: _selectedDate!, accent: kBank,  summary: _summary['BANKNIFTY'],
               oiStats: _oiStats['BANKNIFTY'] ?? [], oiLoading: _oiLoading['BANKNIFTY'] ?? false,
               oiHistograms: _oiHistograms['BANKNIFTY'] ?? [], oiHistLoading: _oiHistLoading['BANKNIFTY'] ?? false,
+              histInterval: _histInterval, onIntervalChanged: (v) { setState((){ _histInterval = v; }); _phase2and3(); },
               border: false, isMobile: true),
             const Divider(color: kBorder, height: 1, thickness: 1.5),
             _Panel(symbol: 'FINNIFTY', date: _selectedDate!, accent: Colors.purple,  summary: _summary['FINNIFTY'],
               oiStats: _oiStats['FINNIFTY'] ?? [], oiLoading: _oiLoading['FINNIFTY'] ?? false,
               oiHistograms: _oiHistograms['FINNIFTY'] ?? [], oiHistLoading: _oiHistLoading['FINNIFTY'] ?? false,
+              histInterval: _histInterval, onIntervalChanged: (v) { setState((){ _histInterval = v; }); _phase2and3(); },
               border: false, isMobile: true),
           ],
         );
@@ -923,21 +936,59 @@ class _TradingDashboardState extends State<TradingDashboard> {
             child: _Panel(symbol: 'NIFTY', date: _selectedDate!, accent: kNifty, summary: _summary['NIFTY'],
               oiStats: _oiStats['NIFTY'] ?? [], oiLoading: _oiLoading['NIFTY'] ?? false,
               oiHistograms: _oiHistograms['NIFTY'] ?? [], oiHistLoading: _oiHistLoading['NIFTY'] ?? false,
+              histInterval: _histInterval, onIntervalChanged: (v) { setState((){ _histInterval = v; }); _phase2and3(); },
               border: true, isMobile: false),
           ),
           Expanded(
             child: _Panel(symbol: 'BANKNIFTY', date: _selectedDate!, accent: kBank,  summary: _summary['BANKNIFTY'],
               oiStats: _oiStats['BANKNIFTY'] ?? [], oiLoading: _oiLoading['BANKNIFTY'] ?? false,
               oiHistograms: _oiHistograms['BANKNIFTY'] ?? [], oiHistLoading: _oiHistLoading['BANKNIFTY'] ?? false,
+              histInterval: _histInterval, onIntervalChanged: (v) { setState((){ _histInterval = v; }); _phase2and3(); },
               border: true, isMobile: false),
           ),
           Expanded(
             child: _Panel(symbol: 'FINNIFTY', date: _selectedDate!, accent: Colors.purple,  summary: _summary['FINNIFTY'],
               oiStats: _oiStats['FINNIFTY'] ?? [], oiLoading: _oiLoading['FINNIFTY'] ?? false,
               oiHistograms: _oiHistograms['FINNIFTY'] ?? [], oiHistLoading: _oiHistLoading['FINNIFTY'] ?? false,
+              histInterval: _histInterval, onIntervalChanged: (v) { setState((){ _histInterval = v; }); _phase2and3(); },
               border: false, isMobile: false),
           ),
         ]);
+      }
+    });
+  }
+
+  Widget _buildHeavyweightsTier() {
+    return LayoutBuilder(builder: (context, constraints) {
+      final hw = ['RELIANCE', 'HDFCBANK', 'ICICIBANK', 'INFY', 'TCS'];
+      if (constraints.maxWidth < 900) {
+        return ListView(
+          padding: EdgeInsets.zero,
+          children: hw.map((sym) => Column(
+            children: [
+              _Panel(symbol: sym, date: _selectedDate!, accent: Colors.blueAccent, summary: _summary[sym],
+                oiStats: _oiStats[sym] ?? [], oiLoading: _oiLoading[sym] ?? false,
+                oiHistograms: _oiHistograms[sym] ?? [], oiHistLoading: _oiHistLoading[sym] ?? false,
+                histInterval: _histInterval, onIntervalChanged: (v) { setState((){ _histInterval = v; }); _phase2and3(); },
+                border: false, isMobile: true),
+              const Divider(color: kBorder, height: 1, thickness: 1.5),
+            ],
+          )).toList(),
+        );
+      } else {
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: hw.map((sym) => SizedBox(
+               width: 480, // Fixed width prevents squishing
+               child: _Panel(symbol: sym, date: _selectedDate!, accent: Colors.blueAccent, summary: _summary[sym],
+                  oiStats: _oiStats[sym] ?? [], oiLoading: _oiLoading[sym] ?? false,
+                  oiHistograms: _oiHistograms[sym] ?? [], oiHistLoading: _oiHistLoading[sym] ?? false,
+                  histInterval: _histInterval, onIntervalChanged: (v) { setState((){ _histInterval = v; }); _phase2and3(); },
+                  border: sym != hw.last, isMobile: false),
+            )).toList(),
+          )
+        );
       }
     });
   }
@@ -1051,8 +1102,11 @@ class _Panel extends StatelessWidget {
   const _Panel({
     required this.symbol, required this.date, required this.accent, required this.summary,
     required this.oiStats, required this.oiLoading, required this.border, required this.isMobile,
-    required this.oiHistograms, required this.oiHistLoading,
+    required this.oiHistograms, required this.oiHistLoading, required this.histInterval, required this.onIntervalChanged,
   });
+  
+  final int histInterval;
+  final ValueChanged<int> onIntervalChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1066,12 +1120,6 @@ class _Panel extends StatelessWidget {
           if (summary != null) _StatRow(summary: summary!, accent: accent),
           const SizedBox(height: 10),
 
-          // 🆕 Multi-Timeframe Histogram
-          oiHistLoading
-            ? _PlaceholderCard(label: 'Loading Histograms…', accent: accent, height: 180)
-            : (oiHistograms.isEmpty
-                ? _PlaceholderCard(label: 'No Histogram data', accent: accent, height: 180, error: true)
-                : _OiHistogramChart(histograms: oiHistograms, accent: accent)),
           const SizedBox(height: 10),
 
           // ③ OI Line chart
@@ -1112,6 +1160,29 @@ class _Panel extends StatelessWidget {
             : (oiStats.isEmpty
                 ? _PlaceholderCard(label: 'No chart data', accent: accent, height: 140, error: true)
                 : _MaxPainChart(oiStats: oiStats, accent: accent)),
+          const SizedBox(height: 10),
+
+          // 🆕 Multi-Timeframe Histogram (Shifted down & upgraded to Strike-Wise)
+          Row(
+             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+             children: [
+                const Text('📊 HISTORICAL OI DELTA', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+                DropdownButton<int>(
+                   value: histInterval,
+                   dropdownColor: kSurface2,
+                   underline: const SizedBox(),
+                   icon: const Icon(Icons.arrow_drop_down, color: Colors.white54, size: 20),
+                   style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                   onChanged: (val) { if (val != null) onIntervalChanged(val); },
+                   items: [5, 15, 30, 60, 120].map((e) => DropdownMenuItem(value: e, child: Text('${e}m Delta'))).toList(),
+                )
+             ]
+          ),
+          oiHistLoading
+            ? _PlaceholderCard(label: 'Loading Histograms…', accent: accent, height: 180)
+            : (oiHistograms.isEmpty
+                ? _PlaceholderCard(label: 'No Histogram data for interval', accent: accent, height: 180, error: true)
+                : _OiHistogramChart(histograms: oiHistograms, accent: accent)),
           const SizedBox(height: 10),
 
           // ⑧ Option chain (On-demand Phase 3)
@@ -1203,7 +1274,7 @@ class _SignalCardState extends State<_SignalCard> with SingleTickerProviderState
                           decoration: BoxDecoration(color: sc, borderRadius: BorderRadius.circular(2)),
                         ),
                         const SizedBox(width: 8),
-                        Text(widget.symbol == 'BANKNIFTY' ? 'BNF' : 'NFT', style: TextStyle(color: widget.accent, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+                        Text(widget.symbol == 'BANKNIFTY' ? 'BNF' : (widget.symbol == 'FINNIFTY' ? 'FIN' : 'NFT'), style: TextStyle(color: widget.accent, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
                         const SizedBox(width: 8),
                         Text(mainWord, style: TextStyle(color: sc, fontSize: 13, fontWeight: FontWeight.w900)),
                       ],
@@ -1301,7 +1372,10 @@ class _OiHistogramChart extends StatelessWidget {
 
     double maxY = 0;
     double minY = 0;
-    for (var h in histograms) {
+    final validH = histograms.where((h) => h['ce_change'] != 0 || h['pe_change'] != 0).toList();
+    if (validH.isEmpty) return const Center(child: Text("No OI change in this interval.", style: TextStyle(color: Colors.white54, fontSize: 12)));
+
+    for (var h in validH) {
        final ce = (h['ce_change'] ?? 0).toDouble();
        final pe = (h['pe_change'] ?? 0).toDouble();
        if (ce > maxY) maxY = ce;
@@ -1312,23 +1386,23 @@ class _OiHistogramChart extends StatelessWidget {
     if (maxY == 0 && minY == 0) maxY = 1000;
     
     final barGroups = <BarChartGroupData>[];
-    for (int i=0; i<histograms.length; i++) {
-        final h = histograms[i];
+    for (int i=0; i<validH.length; i++) {
+        final h = validH[i];
         final ce = (h['ce_change'] ?? 0).toDouble();
         final pe = (h['pe_change'] ?? 0).toDouble();
         
         barGroups.add(BarChartGroupData(
            x: i,
            barRods: [
-              BarChartRodData(toY: ce, color: kGreen, width: 14, borderRadius: BorderRadius.circular(2)),
-              BarChartRodData(toY: pe, color: kRed, width: 14, borderRadius: BorderRadius.circular(2)),
+              BarChartRodData(toY: ce, color: kGreen, width: 4, borderRadius: BorderRadius.circular(1)),
+              BarChartRodData(toY: pe, color: kRed, width: 4, borderRadius: BorderRadius.circular(1)),
            ],
-           barsSpace: 4,
+           barsSpace: 2,
         ));
     }
 
     return _ChartCard(
-      title: 'HISTORIC OI DELTAS  🟢 CE  🔴 PE',
+      title: 'HISTORIC OI DELTA [STRIKE-WISE]  🟢 CE  🔴 PE',
       icon: Icons.bar_chart_rounded, height: 180,
       child: BarChart(
         swapAnimationDuration: Duration.zero,
@@ -1349,9 +1423,11 @@ class _OiHistogramChart extends StatelessWidget {
             )),
             bottomTitles: AxisTitles(sideTitles: SideTitles(
               showTitles: true, reservedSize: 22,
+              interval: (validH.length / 10).clamp(1, 999).toDouble(),
               getTitlesWidget: (v, _) {
-                 if (v.toInt() >= 0 && v.toInt() < histograms.length) {
-                    return Padding(padding: const EdgeInsets.only(top: 8), child: Text(histograms[v.toInt()]['interval'], style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.bold)));
+                 if (v.toInt() >= 0 && v.toInt() < validH.length) {
+                    final strike = validH[v.toInt()]['strike'] ?? '';
+                    return Padding(padding: const EdgeInsets.only(top: 8), child: Text('$strike', style: const TextStyle(color: Colors.white60, fontSize: 8, fontWeight: FontWeight.bold)));
                  }
                  return const SizedBox();
               }
@@ -1363,7 +1439,8 @@ class _OiHistogramChart extends StatelessWidget {
                 getTooltipItem: (group, groupIndex, rod, rodIndex) {
                    final val = NumberFormat.compact().format(rod.toY);
                    final side = rodIndex == 0 ? 'CE' : 'PE';
-                   return BarTooltipItem('$side: $val', TextStyle(color: rod.color, fontWeight: FontWeight.bold, fontSize: 11));
+                   final strike = validH[groupIndex]['strike'] ?? '';
+                   return BarTooltipItem('$strike ($side)\n$val', TextStyle(color: rod.color, fontWeight: FontWeight.bold, fontSize: 11));
                 }
              )
           )
@@ -1990,8 +2067,9 @@ class _HeaderState extends State<_Header> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _TabButton(label: '🌐 MARKET PULSE', active: widget.activeTabIndex == 0, onTap: () => widget.onTabChanged(0)),
-          _TabButton(label: '📊 ANALYTICS', active: widget.activeTabIndex == 1, onTap: () => widget.onTabChanged(1)),
-          _TabButton(label: '⚡ COMMAND HUB', active: widget.activeTabIndex == 2, onTap: () => widget.onTabChanged(2)),
+          _TabButton(label: '📈 INDEX ANALYTICS', active: widget.activeTabIndex == 1, onTap: () => widget.onTabChanged(1)),
+          _TabButton(label: '🏢 STOCK OPTIONS', active: widget.activeTabIndex == 2, onTap: () => widget.onTabChanged(2)),
+          _TabButton(label: '⚡ COMMAND HUB', active: widget.activeTabIndex == 3, onTap: () => widget.onTabChanged(3)),
         ],
       ),
     );

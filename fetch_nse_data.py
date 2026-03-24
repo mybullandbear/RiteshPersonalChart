@@ -12,7 +12,7 @@ import market_signals
 import zerodha_trader
 
 # --- Configuration ---
-INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY"]
+INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "RELIANCE", "HDFCBANK", "ICICIBANK", "INFY", "TCS"]
 DATA_DIR = "data"
 EXPIRIES_FILE = "expiries.json"
 LINKS_FILE = "nse_links.txt"
