@@ -108,6 +108,8 @@ class _TradingDashboardState extends State<TradingDashboard> {
   Map<String, dynamic>? _mtfTrend;
   Future<Map<String, dynamic>>? _tradingStateFuture;
   Map<String, dynamic> _marketExtras = {};
+  Map<String, List<dynamic>> _oiHistograms = {};
+  Map<String, bool> _oiHistLoading = {};
 
   @override
   void initState() {
@@ -249,13 +251,19 @@ class _TradingDashboardState extends State<TradingDashboard> {
     }).catchError((_) {});
 
     for (final sym in ['NIFTY', 'BANKNIFTY', 'FINNIFTY']) {
-      setState(() { _oiLoading[sym] = true; });
+      setState(() { _oiLoading[sym] = true; _oiHistLoading[sym] = true; });
 
       // OI charts (we compute Max Pain now since you want visuals!)
       _api.getOiStats(sym, date, skipMaxPain: false).then((oi) {
         if (mounted) setState(() { _oiStats[sym] = oi; _oiLoading[sym] = false; });
       }).catchError((_) {
         if (mounted) setState(() => _oiLoading[sym] = false);
+      });
+      
+      _api.getOiHistograms(sym, date).then((hist) {
+        if (mounted) setState(() { _oiHistograms[sym] = hist; _oiHistLoading[sym] = false; });
+      }).catchError((_) {
+        if (mounted) setState(() => _oiHistLoading[sym] = false);
       });
     }
   }
@@ -887,14 +895,17 @@ class _TradingDashboardState extends State<TradingDashboard> {
           children: [
             _Panel(symbol: 'NIFTY', date: _selectedDate!, accent: kNifty, summary: _summary['NIFTY'],
               oiStats: _oiStats['NIFTY'] ?? [], oiLoading: _oiLoading['NIFTY'] ?? false,
+              oiHistograms: _oiHistograms['NIFTY'] ?? [], oiHistLoading: _oiHistLoading['NIFTY'] ?? false,
               border: false, isMobile: true),
             const Divider(color: kBorder, height: 1, thickness: 1.5),
             _Panel(symbol: 'BANKNIFTY', date: _selectedDate!, accent: kBank,  summary: _summary['BANKNIFTY'],
               oiStats: _oiStats['BANKNIFTY'] ?? [], oiLoading: _oiLoading['BANKNIFTY'] ?? false,
+              oiHistograms: _oiHistograms['BANKNIFTY'] ?? [], oiHistLoading: _oiHistLoading['BANKNIFTY'] ?? false,
               border: false, isMobile: true),
             const Divider(color: kBorder, height: 1, thickness: 1.5),
             _Panel(symbol: 'FINNIFTY', date: _selectedDate!, accent: Colors.purple,  summary: _summary['FINNIFTY'],
               oiStats: _oiStats['FINNIFTY'] ?? [], oiLoading: _oiLoading['FINNIFTY'] ?? false,
+              oiHistograms: _oiHistograms['FINNIFTY'] ?? [], oiHistLoading: _oiHistLoading['FINNIFTY'] ?? false,
               border: false, isMobile: true),
           ],
         );
@@ -904,16 +915,19 @@ class _TradingDashboardState extends State<TradingDashboard> {
           Expanded(
             child: _Panel(symbol: 'NIFTY', date: _selectedDate!, accent: kNifty, summary: _summary['NIFTY'],
               oiStats: _oiStats['NIFTY'] ?? [], oiLoading: _oiLoading['NIFTY'] ?? false,
+              oiHistograms: _oiHistograms['NIFTY'] ?? [], oiHistLoading: _oiHistLoading['NIFTY'] ?? false,
               border: true, isMobile: false),
           ),
           Expanded(
             child: _Panel(symbol: 'BANKNIFTY', date: _selectedDate!, accent: kBank,  summary: _summary['BANKNIFTY'],
               oiStats: _oiStats['BANKNIFTY'] ?? [], oiLoading: _oiLoading['BANKNIFTY'] ?? false,
+              oiHistograms: _oiHistograms['BANKNIFTY'] ?? [], oiHistLoading: _oiHistLoading['BANKNIFTY'] ?? false,
               border: true, isMobile: false),
           ),
           Expanded(
             child: _Panel(symbol: 'FINNIFTY', date: _selectedDate!, accent: Colors.purple,  summary: _summary['FINNIFTY'],
               oiStats: _oiStats['FINNIFTY'] ?? [], oiLoading: _oiLoading['FINNIFTY'] ?? false,
+              oiHistograms: _oiHistograms['FINNIFTY'] ?? [], oiHistLoading: _oiHistLoading['FINNIFTY'] ?? false,
               border: false, isMobile: false),
           ),
         ]);
@@ -1024,9 +1038,13 @@ class _Panel extends StatelessWidget {
   final bool border;
   final bool isMobile;
 
+  final List<dynamic> oiHistograms;
+  final bool oiHistLoading;
+
   const _Panel({
     required this.symbol, required this.date, required this.accent, required this.summary,
     required this.oiStats, required this.oiLoading, required this.border, required this.isMobile,
+    required this.oiHistograms, required this.oiHistLoading,
   });
 
   @override
@@ -1039,6 +1057,14 @@ class _Panel extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           // ② OI stat chips (instant after phase1)
           if (summary != null) _StatRow(summary: summary!, accent: accent),
+          const SizedBox(height: 10),
+
+          // 🆕 Multi-Timeframe Histogram
+          oiHistLoading
+            ? _PlaceholderCard(label: 'Loading Histograms…', accent: accent, height: 180)
+            : (oiHistograms.isEmpty
+                ? _PlaceholderCard(label: 'No Histogram data', accent: accent, height: 180, error: true)
+                : _OiHistogramChart(histograms: oiHistograms, accent: accent)),
           const SizedBox(height: 10),
 
           // ③ OI Line chart
@@ -1254,6 +1280,90 @@ class _StatRow extends StatelessWidget {
       ]),
     ),
   );
+}
+
+// ─── Oi Histogram Bar Chart ──────────────────────────────────────
+class _OiHistogramChart extends StatelessWidget {
+  final List<dynamic> histograms;
+  final Color accent;
+  const _OiHistogramChart({required this.histograms, required this.accent});
+
+  @override
+  Widget build(BuildContext context) {
+    if (histograms.isEmpty) return const SizedBox();
+
+    double maxY = 0;
+    double minY = 0;
+    for (var h in histograms) {
+       final ce = (h['ce_change'] ?? 0).toDouble();
+       final pe = (h['pe_change'] ?? 0).toDouble();
+       if (ce > maxY) maxY = ce;
+       if (pe > maxY) maxY = pe;
+       if (ce < minY) minY = ce;
+       if (pe < minY) minY = pe;
+    }
+    if (maxY == 0 && minY == 0) maxY = 1000;
+    
+    final barGroups = <BarChartGroupData>[];
+    for (int i=0; i<histograms.length; i++) {
+        final h = histograms[i];
+        final ce = (h['ce_change'] ?? 0).toDouble();
+        final pe = (h['pe_change'] ?? 0).toDouble();
+        
+        barGroups.add(BarChartGroupData(
+           x: i,
+           barRods: [
+              BarChartRodData(toY: ce, color: kGreen, width: 14, borderRadius: BorderRadius.circular(2)),
+              BarChartRodData(toY: pe, color: kRed, width: 14, borderRadius: BorderRadius.circular(2)),
+           ],
+           barsSpace: 4,
+        ));
+    }
+
+    return _ChartCard(
+      title: 'HISTORIC OI DELTAS  🟢 CE  🔴 PE',
+      icon: Icons.bar_chart_rounded, height: 180,
+      child: BarChart(
+        swapAnimationDuration: Duration.zero,
+        BarChartData(
+          maxY: maxY + (maxY - minY)*0.1,
+          minY: minY < 0 ? minY - (maxY - minY)*0.1 : 0,
+          gridData: FlGridData(
+            drawVerticalLine: false,
+            getDrawingHorizontalLine: (v) => FlLine(color: v == 0 ? Colors.white54 : kBorder, strokeWidth: v == 0 ? 1 : 0.5)
+          ),
+          borderData: FlBorderData(show: false),
+          titlesData: FlTitlesData(
+            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            leftTitles: AxisTitles(sideTitles: SideTitles(
+              showTitles: true, reservedSize: 32,
+              getTitlesWidget: (v, _) => Text(NumberFormat.compact().format(v), style: const TextStyle(color: Colors.white24, fontSize: 8)),
+            )),
+            bottomTitles: AxisTitles(sideTitles: SideTitles(
+              showTitles: true, reservedSize: 22,
+              getTitlesWidget: (v, _) {
+                 if (v.toInt() >= 0 && v.toInt() < histograms.length) {
+                    return Padding(padding: const EdgeInsets.only(top: 8), child: Text(histograms[v.toInt()]['interval'], style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.bold)));
+                 }
+                 return const SizedBox();
+              }
+            )),
+          ),
+          barGroups: barGroups,
+          barTouchData: BarTouchData(
+             touchTooltipData: BarTouchTooltipData(
+                getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                   final val = NumberFormat.compact().format(rod.toY);
+                   final side = rodIndex == 0 ? 'CE' : 'PE';
+                   return BarTooltipItem('$side: $val', TextStyle(color: rod.color, fontWeight: FontWeight.bold, fontSize: 11));
+                }
+             )
+          )
+        )
+      )
+    );
+  }
 }
 
 // ─── OI Line Chart ─────────────────────────────────────────────

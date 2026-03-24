@@ -152,4 +152,14 @@ class ApiService {
     }
     throw Exception('market_extras failed');
   }
+
+  Future<List<dynamic>> getOiHistograms(String symbol, [String? date]) async {
+    String url = '$_base/oi_histograms?symbol=$symbol';
+    if (date != null) url += '&date=$date';
+    final r = await http.get(Uri.parse(url)).timeout(_fast);
+    if (r.statusCode == 200) {
+      return json.decode(r.body) as List<dynamic>;
+    }
+    throw Exception('oi_histograms failed');
+  }
 }

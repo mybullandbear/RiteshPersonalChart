@@ -990,6 +990,47 @@ def quick_summary():
         session.close()
 
 
+@app.route('/api/oi_histograms')
+def get_oi_histograms():
+    """Returns exact OI changes over 5m, 15m, and 30m intervals."""
+    symbol = request.args.get('symbol', 'NIFTY')
+    date_str = request.args.get('date')
+    
+    engine = get_db_engine(date_str)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    try:
+        latest = session.query(OptionChainData).filter(OptionChainData.symbol == symbol).order_by(OptionChainData.timestamp.desc()).first()
+        if not latest: return jsonify([])
+        
+        latest_ts = latest.timestamp
+        latest_rows = session.query(OptionChainData).filter(OptionChainData.symbol == symbol, OptionChainData.timestamp == latest_ts).all()
+        latest_ce = sum(r.ce_oi or 0 for r in latest_rows)
+        latest_pe = sum(r.pe_oi or 0 for r in latest_rows)
+        
+        from datetime import timedelta
+        intervals = [5, 15, 30]
+        histograms = []
+        for mn in intervals:
+            past_time = latest_ts - timedelta(minutes=mn)
+            past_record = session.query(OptionChainData).filter(OptionChainData.symbol == symbol, OptionChainData.timestamp <= past_time).order_by(OptionChainData.timestamp.desc()).first()
+            if past_record:
+                past_rows = session.query(OptionChainData).filter(OptionChainData.symbol == symbol, OptionChainData.timestamp == past_record.timestamp).all()
+                past_ce = sum(r.ce_oi or 0 for r in past_rows)
+                past_pe = sum(r.pe_oi or 0 for r in past_rows)
+                histograms.append({
+                    'interval': f'{mn}m',
+                    'ce_change': latest_ce - past_ce,
+                    'pe_change': latest_pe - past_pe
+                })
+            else:
+                histograms.append({'interval': f'{mn}m', 'ce_change': 0, 'pe_change': 0})
+        return jsonify(histograms)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
 @app.route('/api/trade_history')
 def get_trade_history():
     """Returns contents of trade_history.json"""
