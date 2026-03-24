@@ -16,13 +16,14 @@ class QuickSummary {
   final double? highCeStrike;
   final double? highPeStrike;
   final List<String> alerts;
+  final double? maxPain;
 
   QuickSummary({required this.spot, required this.timestamp,
     required this.signal, required this.color, required this.atm,
     required this.ceOi, required this.peOi, required this.pcr,
     this.nearPcr, required this.confluence, this.suggestedStrike,
     this.atmCeOi, this.atmPeOi, this.exitAlert, this.highCeStrike, this.highPeStrike,
-    this.alerts = const []});
+    this.alerts = const [], this.maxPain});
 
   factory QuickSummary.fromJson(Map<String, dynamic> j) => QuickSummary(
     spot:      (j['spot'] ?? 0).toDouble(),
@@ -41,6 +42,7 @@ class QuickSummary {
     exitAlert: j['exit_alert'],
     highCeStrike: j['high_ce_strike']?.toDouble(),
     highPeStrike: j['high_pe_strike']?.toDouble(),
+    maxPain:   j['max_pain']?.toDouble(),
     alerts:    j['alerts'] != null ? List<String>.from(j['alerts']) : const [],
   );
 }

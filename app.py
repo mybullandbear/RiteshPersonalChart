@@ -777,6 +777,21 @@ def quick_summary():
             total_pe_oi = sum(r.pe_oi or 0 for r in rows)
             pcr = round(total_pe_oi / total_ce_oi, 2) if total_ce_oi > 0 else 0
 
+            # 🛑 Max Pain Calculation
+            max_pain = 0
+            if rows:
+                 try:
+                     min_loss = float('inf')
+                     for strike_r in rows:
+                         strike = strike_r.strike_price
+                         loss = sum((strike - r.strike_price) * (r.ce_oi or 0) for r in rows if r.strike_price < strike)
+                         loss += sum((r.strike_price - strike) * (r.pe_oi or 0) for r in rows if r.strike_price > strike)
+                         if loss < min_loss:
+                             min_loss = loss
+                             max_pain = strike
+                 except Exception as e:
+                     print("Max pain error:", e)
+
             # ATM strike & signal
             atm = min(rows, key=lambda x: abs(x.strike_price - spot_price), default=None)
             signal, color = 'NEUTRAL', '#94a3b8'
@@ -820,7 +835,7 @@ def quick_summary():
                 try:
                     from datetime import timedelta
                     past_time = ts - timedelta(minutes=5)
-                    past_record = session.query(OptionChainData.underlying_price).filter(
+                    past_record = session.query(OptionChainData.underlying_price, OptionChainData.timestamp).filter(
                         OptionChainData.symbol == sym,
                         OptionChainData.timestamp <= past_time
                     ).order_by(OptionChainData.timestamp.desc()).first()
@@ -828,6 +843,18 @@ def quick_summary():
                     trend_5m = 0
                     if past_record:
                         trend_5m = spot_price - past_record[0]
+                        try:
+                             past_rows = session.query(OptionChainData).filter(OptionChainData.symbol == sym, OptionChainData.timestamp == past_record[1]).all()
+                             past_ce = sum(r.ce_oi or 0 for r in past_rows)
+                             past_pe = sum(r.pe_oi or 0 for r in past_rows)
+                             past_pcr = round(past_pe / past_ce, 2) if past_ce > 0 else pcr
+                             
+                             if trend_5m > 15 and past_pcr > 0 and pcr < past_pcr * 0.9:
+                                 alerts.append(f"BEARISH DIVERGENCE (Spot +{int(trend_5m)}, PCR {past_pcr}->{pcr})")
+                             elif trend_5m < -15 and past_pcr > 0 and pcr > past_pcr * 1.1:
+                                 alerts.append(f"BULLISH DIVERGENCE (Spot {int(trend_5m)}, PCR {past_pcr}->{pcr})")
+                        except Exception as e:
+                             print("Divergence error:", e)
                         
                     # Base score based on PCR alignment
                     base = 65
@@ -874,6 +901,7 @@ def quick_summary():
                 'exit_alert': exit_alert,
                 'high_ce_strike': high_ce.strike_price if high_ce else 0,
                 'high_pe_strike': high_pe.strike_price if high_pe else 0,
+                'max_pain':  max_pain,
                 'alerts':    alerts,
             }
             

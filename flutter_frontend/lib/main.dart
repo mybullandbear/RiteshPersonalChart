@@ -1197,6 +1197,10 @@ class _SignalCardState extends State<_SignalCard> with SingleTickerProviderState
                       Text('🎯 ${widget.summary!.suggestedStrike!.toStringAsFixed(0)}', style: const TextStyle(color: Colors.amberAccent, fontSize: 11, fontWeight: FontWeight.bold)),
                       const SizedBox(width: 12),
                     ],
+                    if (widget.summary!.maxPain != null && widget.summary!.maxPain! > 0) ...[
+                       Text('🧲 Max Pain: ${widget.summary!.maxPain!.toStringAsFixed(0)}', style: const TextStyle(color: Colors.purpleAccent, fontSize: 11, fontWeight: FontWeight.w900)),
+                       const SizedBox(width: 12),
+                    ],
                     Text('Spot: ${NumberFormat("#,##0").format(widget.summary!.spot)}', style: const TextStyle(color: Colors.white70, fontSize: 11)),
                     const SizedBox(width: 12),
                     Text('PCR: ${widget.summary!.pcr.toStringAsFixed(2)}', style: TextStyle(color: widget.summary!.pcr > 1.0 ? kGreen : kRed, fontSize: 11, fontWeight: FontWeight.w900)),
