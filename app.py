@@ -408,8 +408,31 @@ def get_data():
             .filter(OptionChainData.symbol == symbol, OptionChainData.timestamp == timestamp)\
             .all()
         
+        try:
+            import py_vollib.black_scholes.greeks.analytical as greeks
+        except ImportError:
+            greeks = None
+
         result = []
         for row in records:
+            ce_delta, ce_gamma, pe_delta, pe_gamma = 0, 0, 0, 0
+            if greeks and row.underlying_price and row.strike_price:
+                try:
+                    exp_dt = datetime.strptime(row.expiry_date, '%d-%b-%Y')
+                    t = max(0.001, (exp_dt - timestamp).total_seconds() / (365.25 * 24 * 3600))
+                    S = row.underlying_price
+                    K = row.strike_price
+                    r = 0.10
+                    
+                    c_iv = max(0.001, (row.ce_iv or 0) / 100.0)
+                    p_iv = max(0.001, (row.pe_iv or 0) / 100.0)
+                    
+                    ce_delta = greeks.delta('c', S, K, t, r, c_iv)
+                    ce_gamma = greeks.gamma('c', S, K, t, r, c_iv)
+                    pe_delta = greeks.delta('p', S, K, t, r, p_iv)
+                    pe_gamma = greeks.gamma('p', S, K, t, r, p_iv)
+                except: pass
+
             result.append({
                 'strike_price': row.strike_price,
                 'expiry_date': row.expiry_date,
@@ -420,7 +443,9 @@ def get_data():
                     'oi': row.ce_oi,
                     'change_oi': row.ce_change_oi,
                     'volume': row.ce_volume,
-                    'iv': row.ce_iv
+                    'iv': row.ce_iv,
+                    'delta': round(ce_delta, 4),
+                    'gamma': round(ce_gamma, 4)
                 },
                 'pe': {
                     'last_price': row.pe_last_price,
@@ -428,7 +453,9 @@ def get_data():
                     'oi': row.pe_oi,
                     'change_oi': row.pe_change_oi,
                     'volume': row.pe_volume,
-                    'iv': row.pe_iv
+                    'iv': row.pe_iv,
+                    'delta': round(pe_delta, 4),
+                    'gamma': round(pe_gamma, 4)
                 }
             })
         return jsonify(result)

@@ -101,8 +101,10 @@ class OptionSide {
   final int? changeOi;
   final int? volume;
   final double? iv;
+  final double? delta;
+  final double? gamma;
 
-  OptionSide({this.lastPrice, this.change, this.oi, this.changeOi, this.volume, this.iv});
+  OptionSide({this.lastPrice, this.change, this.oi, this.changeOi, this.volume, this.iv, this.delta, this.gamma});
 
   factory OptionSide.fromJson(Map<String, dynamic> j) => OptionSide(
     lastPrice: j['last_price']?.toDouble(),
@@ -111,6 +113,8 @@ class OptionSide {
     changeOi:  j['change_oi']?.toInt(),
     volume:    j['volume']?.toInt(),
     iv:        j['iv']?.toDouble(),
+    delta:     j['delta']?.toDouble(),
+    gamma:     j['gamma']?.toDouble(),
   );
 }
 
