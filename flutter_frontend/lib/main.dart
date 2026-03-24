@@ -110,6 +110,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
   Map<String, dynamic> _marketExtras = {};
   Map<String, List<dynamic>> _oiHistograms = {};
   Map<String, bool> _oiHistLoading = {};
+  int _playbackMinutes = 930; // 930 = 15:30 (Live). 555 = 09:15.
 
   @override
   void initState() {
@@ -168,7 +169,8 @@ class _TradingDashboardState extends State<TradingDashboard> {
     if (_phase1Loading) return;
     _phase1Loading = true;
     try {
-      final s = await _api.getQuickSummary(_selectedDate);
+      final String? timeStr = _playbackMinutes < 930 ? "${_playbackMinutes ~/ 60}:${(_playbackMinutes % 60).toString().padLeft(2, '0')}" : null;
+      final s = await _api.getQuickSummary(_selectedDate, timeStr);
       try {
          final extras = await _api.getMarketExtras();
          _marketExtras = extras;
@@ -253,14 +255,16 @@ class _TradingDashboardState extends State<TradingDashboard> {
     for (final sym in ['NIFTY', 'BANKNIFTY', 'FINNIFTY']) {
       setState(() { _oiLoading[sym] = true; _oiHistLoading[sym] = true; });
 
+      final String? timeStr = _playbackMinutes < 930 ? "${_playbackMinutes ~/ 60}:${(_playbackMinutes % 60).toString().padLeft(2, '0')}" : null;
+
       // OI charts (we compute Max Pain now since you want visuals!)
-      _api.getOiStats(sym, date, skipMaxPain: false).then((oi) {
+      _api.getOiStats(sym, date, skipMaxPain: false, time: timeStr).then((oi) {
         if (mounted) setState(() { _oiStats[sym] = oi; _oiLoading[sym] = false; });
       }).catchError((_) {
         if (mounted) setState(() => _oiLoading[sym] = false);
       });
       
-      _api.getOiHistograms(sym, date).then((hist) {
+      _api.getOiHistograms(sym, date, timeStr).then((hist) {
         if (mounted) setState(() { _oiHistograms[sym] = hist; _oiHistLoading[sym] = false; });
       }).catchError((_) {
         if (mounted) setState(() => _oiHistLoading[sym] = false);
@@ -307,6 +311,9 @@ class _TradingDashboardState extends State<TradingDashboard> {
               dates: _dates, selectedDate: _selectedDate,
               lastUpdated: _lastUpdated, refreshing: _refreshing,
               activeTabIndex: _activeTabIndex,
+              playbackMinutes: _playbackMinutes,
+              onPlaybackChanged: (v) => setState(() => _playbackMinutes = v),
+              onPlaybackEnd: (v) { _refreshing = true; _phase1(); _phase2and3(); },
               onTabChanged: (i) => setState(() => _activeTabIndex = i),
               onDateChanged: _onDateChanged, onRefresh: () { _refreshing = true; _phase1(); _phase2and3(); },
             ),
@@ -1906,7 +1913,10 @@ class _Header extends StatefulWidget {
   final DateTime lastUpdated;
   final bool refreshing;
   final int activeTabIndex;
+  final int playbackMinutes;
   final ValueChanged<int> onTabChanged;
+  final ValueChanged<int> onPlaybackChanged;
+  final ValueChanged<int> onPlaybackEnd;
   final ValueChanged<String> onDateChanged;
   final VoidCallback onRefresh;
 
@@ -1914,6 +1924,7 @@ class _Header extends StatefulWidget {
     required this.dates, required this.selectedDate,
     required this.lastUpdated, required this.refreshing,
     required this.activeTabIndex, required this.onTabChanged,
+    required this.playbackMinutes, required this.onPlaybackChanged, required this.onPlaybackEnd,
     required this.onDateChanged, required this.onRefresh
   });
 
@@ -2086,6 +2097,41 @@ class _HeaderState extends State<_Header> {
                   DropdownMenuItem(value: d, child: Text(d))).toList(),
                 onChanged: (v) { if (v != null) widget.onDateChanged(v); })),
           ),
+        const SizedBox(width: 20),
+        
+        // 🕰️ PLAYBACK SCRUBBER
+        Container(
+           padding: const EdgeInsets.symmetric(horizontal: 12),
+           height: 40,
+           decoration: BoxDecoration(color: Colors.white.withOpacity(0.02), borderRadius: BorderRadius.circular(12)),
+           child: Row(
+              children: [
+                 Icon(Icons.history, color: widget.playbackMinutes >= 930 ? Colors.white30 : Colors.amberAccent, size: 16),
+                 const SizedBox(width: 8),
+                 SizedBox(
+                    width: 140,
+                    child: SliderTheme(
+                       data: SliderTheme.of(context).copyWith(trackHeight: 2, thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6), overlayShape: const RoundSliderOverlayShape(overlayRadius: 12)),
+                       child: Slider(
+                         value: widget.playbackMinutes.toDouble(),
+                         min: 555, max: 930, divisions: 930 - 555,
+                         activeColor: widget.playbackMinutes >= 930 ? kGreen : Colors.amberAccent,
+                         inactiveColor: Colors.white12,
+                         onChanged: (v) => widget.onPlaybackChanged(v.toInt()),
+                         onChangeEnd: (v) => widget.onPlaybackEnd(v.toInt()),
+                       )
+                    )
+                 ),
+                 SizedBox(
+                   width: 36,
+                   child: Text(
+                     widget.playbackMinutes >= 930 ? 'LIVE' : '${widget.playbackMinutes ~/ 60}:${(widget.playbackMinutes % 60).toString().padLeft(2, '0')}', 
+                     style: TextStyle(color: widget.playbackMinutes >= 930 ? kGreen : Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 11)
+                   )
+                 )
+              ]
+           )
+        ),
         const SizedBox(width: 25),
         // Clock & Sync Status
         Column(

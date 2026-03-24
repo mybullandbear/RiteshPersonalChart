@@ -15,8 +15,13 @@ class ApiService {
   static const _slow = Duration(seconds: 120);
 
   // ── PHASE 1: one fast call for signals+spots+PCR ─────────
-  Future<Map<String, QuickSummary>> getQuickSummary(String? date) async {
-    final url = date != null ? '$_base/quick_summary?date=$date' : '$_base/quick_summary';
+  Future<Map<String, QuickSummary>> getQuickSummary(String? date, [String? time]) async {
+    String url = '$_base/quick_summary';
+    final params = <String>[];
+    if (date != null) params.add('date=$date');
+    if (time != null) params.add('time=$time');
+    if (params.isNotEmpty) url += '?${params.join('&')}';
+
     final r = await http.get(Uri.parse(url)).timeout(_fast);
     if (r.statusCode == 200) {
       final Map<String, dynamic> data = json.decode(r.body);
@@ -34,9 +39,11 @@ class ApiService {
 
   // ── PHASE 2: OI stats (skip max pain for speed) ──────────
   Future<List<OiStat>> getOiStats(String symbol, String date,
-      {bool skipMaxPain = false}) async {
-    final url = '$_base/oi_stats?symbol=$symbol&date=$date'
-        '${skipMaxPain ? "&skip_max_pain=true" : ""}';
+      {bool skipMaxPain = false, String? time}) async {
+    String url = '$_base/oi_stats?symbol=$symbol&date=$date';
+    if (skipMaxPain) url += '&skip_max_pain=true';
+    if (time != null) url += '&time=$time';
+
     final r = await http.get(Uri.parse(url)).timeout(_slow);
     if (r.statusCode == 200) {
       final List<dynamic> data = json.decode(r.body);
@@ -153,9 +160,10 @@ class ApiService {
     throw Exception('market_extras failed');
   }
 
-  Future<List<dynamic>> getOiHistograms(String symbol, [String? date]) async {
+  Future<List<dynamic>> getOiHistograms(String symbol, [String? date, String? time]) async {
     String url = '$_base/oi_histograms?symbol=$symbol';
     if (date != null) url += '&date=$date';
+    if (time != null) url += '&time=$time';
     final r = await http.get(Uri.parse(url)).timeout(_fast);
     if (r.statusCode == 200) {
       return json.decode(r.body) as List<dynamic>;

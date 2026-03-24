@@ -523,9 +523,10 @@ def calculate_max_pain(session, symbol, timestamp):
 def get_oi_stats():
     symbol = request.args.get('symbol', 'NIFTY')
     date_str = request.args.get('date')  # Optional
+    time_str = request.args.get('time')
     skip_max_pain = request.args.get('skip_max_pain', 'false').lower() == 'true'
 
-    cache_key = f'oi_stats:{symbol}:{date_str}:{skip_max_pain}'
+    cache_key = f'oi_stats:{symbol}:{date_str}:{time_str}:{skip_max_pain}'
     cached = _cache_get(cache_key)
     if cached:
         return jsonify(cached)
@@ -535,7 +536,7 @@ def get_oi_stats():
     session = Session()
     try:
         from sqlalchemy import func
-        grouped_data = session.query(
+        base_q = session.query(
             OptionChainData.timestamp,
             func.sum(OptionChainData.ce_oi).label('total_ce_oi'),
             func.sum(OptionChainData.pe_oi).label('total_pe_oi'),
@@ -543,9 +544,15 @@ def get_oi_stats():
             func.sum(OptionChainData.pe_change_oi).label('total_pe_change_oi'),
             func.max(OptionChainData.underlying_price).label('spot')
         ).filter(OptionChainData.symbol == symbol)\
-         .filter(func.time(OptionChainData.timestamp) >= '09:00:00')\
-         .filter(func.time(OptionChainData.timestamp) <= '15:30:00')\
-         .group_by(OptionChainData.timestamp)\
+         .filter(func.time(OptionChainData.timestamp) >= '09:00:00')
+         
+        if time_str:
+            t_str = time_str if len(time_str) > 5 else f"{time_str}:59"
+            base_q = base_q.filter(func.time(OptionChainData.timestamp) <= t_str)
+        else:
+            base_q = base_q.filter(func.time(OptionChainData.timestamp) <= '15:30:00')
+            
+        grouped_data = base_q.group_by(OptionChainData.timestamp)\
          .order_by(OptionChainData.timestamp)\
          .all()
 
@@ -995,12 +1002,18 @@ def get_oi_histograms():
     """Returns exact OI changes over 5m, 15m, and 30m intervals."""
     symbol = request.args.get('symbol', 'NIFTY')
     date_str = request.args.get('date')
+    time_str = request.args.get('time')
     
     engine = get_db_engine(date_str)
     Session = sessionmaker(bind=engine)
     session = Session()
     try:
-        latest = session.query(OptionChainData).filter(OptionChainData.symbol == symbol).order_by(OptionChainData.timestamp.desc()).first()
+        q = session.query(OptionChainData).filter(OptionChainData.symbol == symbol)
+        if time_str and date_str:
+             t_str = time_str if len(time_str) > 5 else f"{time_str}:59"
+             q = q.filter(OptionChainData.timestamp <= f"{date_str} {t_str}")
+             
+        latest = q.order_by(OptionChainData.timestamp.desc()).first()
         if not latest: return jsonify([])
         
         latest_ts = latest.timestamp
