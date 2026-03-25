@@ -1058,7 +1058,20 @@ def get_oi_histograms():
             if past_record:
                 past_rows = session.query(OptionChainData).filter(OptionChainData.symbol == symbol, OptionChainData.timestamp == past_record.timestamp).all()
                 past_map = {r.strike_price: r for r in past_rows}
-                for r in latest_rows:
+                
+                # 🎯 Restrict to +- 5 strikes near ATM
+                sorted_latest = sorted(latest_rows, key=lambda x: x.strike_price)
+                if sorted_latest:
+                    spot_price = sorted_latest[0].underlying_price or 0
+                    atm_record = min(sorted_latest, key=lambda x: abs(x.strike_price - spot_price))
+                    atm_index = sorted_latest.index(atm_record)
+                    start_idx = max(0, atm_index - 5)
+                    end_idx = min(len(sorted_latest), atm_index + 6)
+                    filtered_rows = sorted_latest[start_idx:end_idx]
+                else:
+                    filtered_rows = []
+
+                for r in filtered_rows:
                     past_r = past_map.get(r.strike_price)
                     if past_r:
                         strike_data.append({
