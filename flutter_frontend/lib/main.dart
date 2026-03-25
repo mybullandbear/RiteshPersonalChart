@@ -1120,6 +1120,27 @@ class _Panel extends StatelessWidget {
           if (summary != null) _StatRow(summary: summary!, accent: accent),
           const SizedBox(height: 10),
 
+          // 🆕 Multi-Timeframe Histogram (Moved to TOP per user request)
+          Row(
+             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+             children: [
+                const Text('📊 HISTORICAL OI DELTA', style: TextStyle(color: Colors.cyanAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                DropdownButton<int>(
+                   value: histInterval,
+                   dropdownColor: kSurface2,
+                   underline: const SizedBox(),
+                   icon: const Icon(Icons.arrow_drop_down, color: Colors.cyanAccent, size: 20),
+                   style: const TextStyle(color: Colors.cyanAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                   onChanged: (val) { if (val != null) onIntervalChanged(val); },
+                   items: [5, 15, 30, 60, 120].map((e) => DropdownMenuItem(value: e, child: Text('${e}m Delta'))).toList(),
+                )
+             ]
+          ),
+          oiHistLoading
+            ? _PlaceholderCard(label: 'Loading Histograms…', accent: accent, height: 180)
+            : (oiHistograms.isEmpty
+                ? _PlaceholderCard(label: 'No Histogram data for interval', accent: accent, height: 180, error: true)
+                : _OiHistogramChart(histograms: oiHistograms, accent: accent, spotPrice: summary?.spot)),
           const SizedBox(height: 10),
 
           // ③ OI Line chart
@@ -1160,29 +1181,6 @@ class _Panel extends StatelessWidget {
             : (oiStats.isEmpty
                 ? _PlaceholderCard(label: 'No chart data', accent: accent, height: 140, error: true)
                 : _MaxPainChart(oiStats: oiStats, accent: accent)),
-          const SizedBox(height: 10),
-
-          // 🆕 Multi-Timeframe Histogram (Shifted down & upgraded to Strike-Wise)
-          Row(
-             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-             children: [
-                const Text('📊 HISTORICAL OI DELTA', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
-                DropdownButton<int>(
-                   value: histInterval,
-                   dropdownColor: kSurface2,
-                   underline: const SizedBox(),
-                   icon: const Icon(Icons.arrow_drop_down, color: Colors.white54, size: 20),
-                   style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                   onChanged: (val) { if (val != null) onIntervalChanged(val); },
-                   items: [5, 15, 30, 60, 120].map((e) => DropdownMenuItem(value: e, child: Text('${e}m Delta'))).toList(),
-                )
-             ]
-          ),
-          oiHistLoading
-            ? _PlaceholderCard(label: 'Loading Histograms…', accent: accent, height: 180)
-            : (oiHistograms.isEmpty
-                ? _PlaceholderCard(label: 'No Histogram data for interval', accent: accent, height: 180, error: true)
-                : _OiHistogramChart(histograms: oiHistograms, accent: accent, spotPrice: summary?.spot)),
           const SizedBox(height: 10),
 
           // ⑧ Option chain (On-demand Phase 3)
@@ -1422,7 +1420,7 @@ class _OiHistogramChart extends StatelessWidget {
           minY: minY < 0 ? minY - (maxY - minY)*0.1 : 0,
           extraLinesData: ExtraLinesData(
              verticalLines: spotIndex == null ? [] : [
-                 VerticalLine(x: spotIndex.toDouble(), color: Colors.blueAccent, strokeWidth: 1.5, dashArray: [4, 4], label: VerticalLineLabel(show: true, alignment: Alignment.topRight, style: const TextStyle(color: Colors.blueAccent, fontSize: 8, fontWeight: FontWeight.bold), labelResolver: (_) => 'SPOT'))
+                 VerticalLine(x: spotIndex.toDouble(), color: Colors.cyanAccent, strokeWidth: 2.0, dashArray: [4, 4], label: VerticalLineLabel(show: true, alignment: Alignment.topRight, style: const TextStyle(color: Colors.cyanAccent, fontSize: 10, fontWeight: FontWeight.w900), labelResolver: (_) => 'SPOT'))
              ]
           ),
           gridData: FlGridData(
