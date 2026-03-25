@@ -890,28 +890,36 @@ def quick_summary():
                         except Exception as e:
                              print("Divergence error:", e)
                         
-                    # Base score based on PCR alignment
-                    base = 65
+                    # 🎯 Directional Confluence Score (0 to 100)
+                    # 50 = Neutral, >50 = Bullish, <50 = Bearish
+                    score = 50
                     if 'Bullish' in signal:
-                        if pcr > 1.1: base += 15
-                        elif pcr > 0.9: base += 5
-                        if trend_5m > 0: base += 20 # Follows trend
-                        confluence = min(99, base)
+                        score = 65 
+                        if pcr > 1.1: score += 10
+                        elif pcr > 0.9: score += 5
+                        # Momentum weight (Spontaneous)
+                        if trend_5m > 5: score += 15
+                        elif trend_5m > 15: score += 25
+                        confluence = min(99, score)
                         
-                        # Exit Alert: Bullish signal but market is suddenly dumping (-10 points)
                         if trend_5m < -10:
                             exit_alert = "CLOSE CALLS (Trend Reversal)"
                             
                     elif 'Bearish' in signal:
-                        if pcr < 0.8: base += 15
-                        elif pcr < 1.0: base += 5
-                        if trend_5m < 0: base += 20 # Follows trend
-                        confluence = min(99, base)
+                        score = 35 # Base bearish
+                        if pcr < 0.8: score -= 10
+                        elif pcr < 1.0: score -= 5
+                        # Momentum weight
+                        if trend_5m < -5: score -= 15
+                        elif trend_5m < -15: score -= 25
+                        confluence = max(1, score)
                         
-                        # Exit Alert: Bearish signal but market is suddenly rallying (+10 points)
                         if trend_5m > 10:
                             exit_alert = "CLOSE PUTS (Trend Reversal)"
-                except:
+                    else:
+                        confluence = 50 # Neutral
+                except Exception as ce_err:
+                    print("Confluence calc error:", ce_err)
                     pass
 
             # High OI Strikes fallback Support/Resistance

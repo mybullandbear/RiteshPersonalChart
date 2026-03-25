@@ -229,20 +229,14 @@ class _TradingDashboardState extends State<TradingDashboard> {
     final s = _summary[sym];
     if (s == null) return 50.0;
     
-    // 1. Near-ATM PCR Sentiment Component (50%)
+    // 1. Near-ATM PCR Sentiment Component (40%)
     double pcr = s.nearPcr ?? s.pcr;
     double pcrScore = (((pcr - 0.5) / 1.0) * 100.0).clamp(0.0, 100.0);
     
-    // 2. Confluence Components & Signals (50%)
-    double confScore = s.confluence.toDouble(); // 0 to 100
-    final String sig = s.signal.toUpperCase();
-    if (sig.contains('SELL')) {
-      confScore = 100.0 - confScore; // Bearish, invert to map on low scale
-    } else if (!sig.contains('BUY')) {
-      confScore = 50.0; // Neutral 
-    }
+    // 2. Confluence Components & Signals (60% weight on intraday Delta OI)
+    double confScore = s.confluence.toDouble(); // Native 0 (Bear) to 100 (Bull)
     
-    return (pcrScore * 0.5) + (confScore * 0.5);
+    return (pcrScore * 0.4) + (confScore * 0.6);
   }
 
   void _phase2and3() {
@@ -976,18 +970,20 @@ class _TradingDashboardState extends State<TradingDashboard> {
           )).toList(),
         );
       } else {
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: hw.map((sym) => SizedBox(
-               width: 480, // Fixed width prevents squishing
-               child: _Panel(symbol: sym, date: _selectedDate!, accent: Colors.blueAccent, summary: _summary[sym],
-                  oiStats: _oiStats[sym] ?? [], oiLoading: _oiLoading[sym] ?? false,
-                  oiHistograms: _oiHistograms[sym] ?? [], oiHistLoading: _oiHistLoading[sym] ?? false,
-                  histInterval: _histInterval, onIntervalChanged: (v) { setState((){ _histInterval = v; }); _phase2and3(); },
-                  border: sym != hw.last, isMobile: true),
-            )).toList(),
-          )
+        return ListView.builder(
+           scrollDirection: Axis.horizontal,
+           itemCount: hw.length,
+           itemBuilder: (context, idx) {
+               final sym = hw[idx];
+               return SizedBox(
+                  width: 480, // Fixed width prevents squishing
+                  child: _Panel(symbol: sym, date: _selectedDate!, accent: Colors.blueAccent, summary: _summary[sym],
+                     oiStats: _oiStats[sym] ?? [], oiLoading: _oiLoading[sym] ?? false,
+                     oiHistograms: _oiHistograms[sym] ?? [], oiHistLoading: _oiHistLoading[sym] ?? false,
+                     histInterval: _histInterval, onIntervalChanged: (v) { setState((){ _histInterval = v; }); _phase2and3(); },
+                     border: sym != hw.last, isMobile: true),
+               );
+           }
         );
       }
     });
@@ -1001,18 +997,18 @@ class _GlobalSignalsBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String nSig = summary['NIFTY']?.signal ?? '';
-    final String bSig = summary['BANKNIFTY']?.signal ?? '';
-    final String fSig = summary['FINNIFTY']?.signal ?? '';
+    final String nSig = summary['NIFTY']?.signal.toUpperCase() ?? '';
+    final String bSig = summary['BANKNIFTY']?.signal.toUpperCase() ?? '';
+    final String fSig = summary['FINNIFTY']?.signal.toUpperCase() ?? '';
     
-    bool bullish = nSig.contains('BUY') && bSig.contains('BUY') && fSig.contains('BUY');
-    bool bearish = nSig.contains('SELL') && bSig.contains('SELL') && fSig.contains('SELL');
+    bool bullish = nSig.contains('BULLISH') && bSig.contains('BULLISH') && fSig.contains('BULLISH');
+    bool bearish = nSig.contains('BEARISH') && bSig.contains('BEARISH') && fSig.contains('BEARISH');
     
     String conf = "NEUTRAL 🟡";
     Color confColor = Colors.amber;
     if (bullish) { conf = "BULLISH CONFLUENCE 🟢"; confColor = kGreen; }
     else if (bearish) { conf = "BEARISH CONFLUENCE 🔴"; confColor = kRed; }
-
+    
     final double width = MediaQuery.of(context).size.width;
     final bool isSmall = width < 600;
 
@@ -1240,7 +1236,7 @@ class _SignalCardState extends State<_SignalCard> with SingleTickerProviderState
 
     final sc = _sColor(widget.summary?.color);
     final String sig = widget.summary!.signal.toUpperCase();
-    final bool isStrongSignal = sig.contains(RegExp(r'BUY|SELL|STRONG'));
+    final bool isStrongSignal = sig.contains(RegExp(r'BUY|SELL|STRONG|BULLISH|BEARISH'));
     
     String mainWord = sig;
     if (sig.contains('(')) {
@@ -1378,7 +1374,8 @@ class _OiHistogramChart extends StatelessWidget {
     if (spotPrice != null && validH.isNotEmpty) {
        double minDiff = double.infinity;
        for (int i=0; i<validH.length; i++) {
-           double s = (validH[i]['strike'] ?? 0).toDouble();
+           final strikeVal = validH[i]['strike'];
+           double s = strikeVal is num ? strikeVal.toDouble() : (double.tryParse(strikeVal.toString()) ?? 0.0);
            double diff = (s - spotPrice!).abs();
            if (diff < minDiff) { minDiff = diff; spotIndex = i; }
        }
@@ -1418,13 +1415,11 @@ class _OiHistogramChart extends StatelessWidget {
         BarChartData(
           maxY: maxY + (maxY - minY)*0.1,
           minY: minY < 0 ? minY - (maxY - minY)*0.1 : 0,
-          extraLinesData: ExtraLinesData(
-             verticalLines: spotIndex == null ? [] : [
-                 VerticalLine(x: spotIndex.toDouble(), color: Colors.cyanAccent, strokeWidth: 2.0, dashArray: [4, 4], label: VerticalLineLabel(show: true, alignment: Alignment.topRight, style: const TextStyle(color: Colors.cyanAccent, fontSize: 10, fontWeight: FontWeight.w900), labelResolver: (_) => 'SPOT'))
-             ]
-          ),
           gridData: FlGridData(
-            drawVerticalLine: false,
+            drawVerticalLine: true,
+            checkToShowVerticalLine: (v) => v.toInt() == spotIndex,
+            getDrawingVerticalLine: (v) => FlLine(color: Colors.cyanAccent, strokeWidth: 2, dashArray: [4, 4]),
+            drawHorizontalLine: true,
             getDrawingHorizontalLine: (v) => FlLine(color: v == 0 ? Colors.white54 : kBorder, strokeWidth: v == 0 ? 1 : 0.5)
           ),
           borderData: FlBorderData(show: false),
@@ -2801,30 +2796,22 @@ class _TripleIndexConfluence extends StatelessWidget {
   final Map<String, QuickSummary> summary;
   const _TripleIndexConfluence({required this.summary});
 
+  double _getScoreForIndex(String sym) {
+    final s = summary[sym];
+    if (s == null) return 50.0;
+    double pcr = s.nearPcr ?? s.pcr;
+    double pcrScore = (((pcr - 0.5) / 1.0) * 100.0).clamp(0.0, 100.0);
+    double confScore = s.confluence.toDouble(); 
+    return (pcrScore * 0.4) + (confScore * 0.6);
+  }
+
   @override
   Widget build(BuildContext context) {
-    double nPcr = summary['NIFTY']?.pcr ?? 1.0;
-    double bPcr = summary['BANKNIFTY']?.pcr ?? 1.0;
-    double fPcr = summary['FINNIFTY']?.pcr ?? 1.0;
+    double nScore = _getScoreForIndex('NIFTY');
+    double bScore = _getScoreForIndex('BANKNIFTY');
+    double fScore = _getScoreForIndex('FINNIFTY');
 
-    bool nBull = nPcr > 1.0;
-    bool bBull = bPcr > 1.0;
-    bool fBull = fPcr > 1.0;
-
-    double avgScore = 0;
-    int count = 0;
-    for (var k in ['NIFTY', 'BANKNIFTY', 'FINNIFTY']) {
-       if (summary[k] != null) {
-          double pcr = summary[k]!.pcr;
-          double pcrScore = (((pcr - 0.5) / 1.0) * 100).clamp(0, 100);
-          double conf = summary[k]!.confluence.toDouble();
-          
-          // Weighted: 40% Absolute PCR + 60% Confluence momentum (including Change in OI checks from backend)
-          avgScore += (pcrScore * 0.4) + (conf * 0.6);
-          count++;
-       }
-    }
-    if (count > 0) avgScore /= count;
+    double avgScore = (nScore + bScore + fScore) / 3.0;
 
     String biasText = avgScore > 50 ? 'BULLISH BIAS' : 'BEARISH BIAS';
     Color biasColor = avgScore > 50 ? kGreen : kRed;
@@ -2861,11 +2848,11 @@ class _TripleIndexConfluence extends StatelessWidget {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  buildBubble('NF', nBull),
+                  buildBubble('NF', nScore > 50),
                   const SizedBox(width: 8),
-                  buildBubble('BN', bBull),
+                  buildBubble('BN', bScore > 50),
                   const SizedBox(width: 8),
-                  buildBubble('FN', fBull),
+                  buildBubble('FN', fScore > 50),
                 ],
               )
             ],
