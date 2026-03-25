@@ -985,7 +985,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
                   oiStats: _oiStats[sym] ?? [], oiLoading: _oiLoading[sym] ?? false,
                   oiHistograms: _oiHistograms[sym] ?? [], oiHistLoading: _oiHistLoading[sym] ?? false,
                   histInterval: _histInterval, onIntervalChanged: (v) { setState((){ _histInterval = v; }); _phase2and3(); },
-                  border: sym != hw.last, isMobile: false),
+                  border: sym != hw.last, isMobile: true),
             )).toList(),
           )
         );
@@ -1182,7 +1182,7 @@ class _Panel extends StatelessWidget {
             ? _PlaceholderCard(label: 'Loading Histograms…', accent: accent, height: 180)
             : (oiHistograms.isEmpty
                 ? _PlaceholderCard(label: 'No Histogram data for interval', accent: accent, height: 180, error: true)
-                : _OiHistogramChart(histograms: oiHistograms, accent: accent)),
+                : _OiHistogramChart(histograms: oiHistograms, accent: accent, spotPrice: summary?.spot)),
           const SizedBox(height: 10),
 
           // ⑧ Option chain (On-demand Phase 3)
@@ -1364,7 +1364,8 @@ class _StatRow extends StatelessWidget {
 class _OiHistogramChart extends StatelessWidget {
   final List<dynamic> histograms;
   final Color accent;
-  const _OiHistogramChart({required this.histograms, required this.accent});
+  final double? spotPrice;
+  const _OiHistogramChart({required this.histograms, required this.accent, this.spotPrice});
 
   @override
   Widget build(BuildContext context) {
@@ -1374,6 +1375,16 @@ class _OiHistogramChart extends StatelessWidget {
     double minY = 0;
     final validH = histograms.where((h) => h['ce_change'] != 0 || h['pe_change'] != 0).toList();
     if (validH.isEmpty) return const Center(child: Text("No OI change in this interval.", style: TextStyle(color: Colors.white54, fontSize: 12)));
+
+    int? spotIndex;
+    if (spotPrice != null && validH.isNotEmpty) {
+       double minDiff = double.infinity;
+       for (int i=0; i<validH.length; i++) {
+           double s = (validH[i]['strike'] ?? 0).toDouble();
+           double diff = (s - spotPrice!).abs();
+           if (diff < minDiff) { minDiff = diff; spotIndex = i; }
+       }
+    }
 
     for (var h in validH) {
        final ce = (h['ce_change'] ?? 0).toDouble();
@@ -1409,6 +1420,11 @@ class _OiHistogramChart extends StatelessWidget {
         BarChartData(
           maxY: maxY + (maxY - minY)*0.1,
           minY: minY < 0 ? minY - (maxY - minY)*0.1 : 0,
+          extraLinesData: ExtraLinesData(
+             verticalLines: spotIndex == null ? [] : [
+                 VerticalLine(x: spotIndex.toDouble(), color: Colors.blueAccent, strokeWidth: 1.5, dashArray: [4, 4], label: VerticalLineLabel(show: true, alignment: Alignment.topRight, style: const TextStyle(color: Colors.blueAccent, fontSize: 8, fontWeight: FontWeight.bold), labelResolver: (_) => 'SPOT'))
+             ]
+          ),
           gridData: FlGridData(
             drawVerticalLine: false,
             getDrawingHorizontalLine: (v) => FlLine(color: v == 0 ? Colors.white54 : kBorder, strokeWidth: v == 0 ? 1 : 0.5)
