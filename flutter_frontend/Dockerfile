@@ -16,7 +16,7 @@ RUN flutter build web --release
 # Stage 2: Serve with Nginx
 FROM nginx:alpine
 COPY --from=build /app/build/web /usr/share/nginx/html
-# Replace default nginx config to handle proxying /api to backend if needed
-# For now, we assume the browser hits 127.0.0.1:5000 directly.
+# Use custom nginx config with reverse proxy to backend
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

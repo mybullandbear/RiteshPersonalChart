@@ -4,15 +4,17 @@ import 'package:http/http.dart' as http;
 import '../models/option_data.dart';
 
 class ApiService {
-  static String get _base {
-    final host = html.window.location.hostname;
-    if (host != null && host.isNotEmpty) {
-      return 'http://$host:5000/api';
-    }
-    return 'http://127.0.0.1:5000/api';
+  // ⚡ Use a relative path so nginx can proxy /api → backend:5000
+  // This avoids cross-origin (CORS) failures when browser hits port 8080 but API is on 5000
+  static const String _base = '/api';
+  static String get baseUrl => 'http://${_currentHost()}/api';
+  
+  static String _currentHost() {
+    try {
+      return html.window.location.hostname ?? '127.0.0.1';
+    } catch(e) { return '127.0.0.1'; }
   }
-  static String get baseUrl => _base;
-
+  
   static const _fast = Duration(seconds: 60);
   static const _slow = Duration(seconds: 120);
 
