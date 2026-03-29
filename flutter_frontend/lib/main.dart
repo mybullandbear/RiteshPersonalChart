@@ -1003,6 +1003,11 @@ class _GlobalSignalsBar extends StatelessWidget {
     final String bSig = summary['BANKNIFTY']?.signal.toUpperCase() ?? '';
     final String fSig = summary['FINNIFTY']?.signal.toUpperCase() ?? '';
     
+    double nScore = _TradingDashboardState.getCompositeScore(summary['NIFTY']);
+    double bScore = _TradingDashboardState.getCompositeScore(summary['BANKNIFTY']);
+    double fScore = _TradingDashboardState.getCompositeScore(summary['FINNIFTY']);
+    double avgScore = (nScore + bScore + fScore) / 3.0;
+    
     bool bullish = nSig.contains('BULLISH') && bSig.contains('BULLISH') && fSig.contains('BULLISH');
     bool bearish = nSig.contains('BEARISH') && bSig.contains('BEARISH') && fSig.contains('BEARISH');
     
