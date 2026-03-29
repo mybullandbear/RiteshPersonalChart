@@ -840,8 +840,18 @@ def quick_summary():
                 sum_ce_chg_oi = sum(r.ce_change_oi or 0 for r in near_strikes)
                 sum_pe_chg_oi = sum(r.pe_change_oi or 0 for r in near_strikes)
                 
-                ce_s = sum_ce_chg_oi > 0 and (sum_pe_chg_oi <= 0 or sum_ce_chg_oi > sum_pe_chg_oi * 1.15)
-                pe_s = sum_pe_chg_oi > 0 and (sum_ce_chg_oi <= 0 or sum_pe_chg_oi > sum_ce_chg_oi * 1.15)
+                # Determine Dynamic Ratios from Config
+                signal_ratio = 1.15
+                min_conf = 70
+                try:
+                    with open("config.json", 'r') as f:
+                        c = json.load(f)
+                        signal_ratio = c.get("SIGNAL_RATIO", 1.5)
+                        min_conf = c.get("MIN_CONFLUENCE", 80)
+                except: pass
+
+                ce_s = sum_ce_chg_oi > 0 and (sum_pe_chg_oi <= 0 or sum_ce_chg_oi > sum_pe_chg_oi * signal_ratio)
+                pe_s = sum_pe_chg_oi > 0 and (sum_ce_chg_oi <= 0 or sum_pe_chg_oi > sum_ce_chg_oi * signal_ratio)
 
                 if ce_s and not pe_s:     signal, color = 'SELL CE (Bearish)', 'red'
                 elif pe_s and not ce_s:   signal, color = 'SELL PE (Bullish)', 'green'
@@ -1017,9 +1027,37 @@ def quick_summary():
                     print("Error checking market hours:", e)
 
                 if is_auto and not pos and is_market_hours and signal not in ['NEUTRAL', 'No Data', 'WAIT']:
-                     # Execute automatically if confluence is high
-                     if confluence >= 70:
-                          trader.execute_trade(signal_data, sym, "AUTO", reason=f"Aggregated Signal ({signal}) Confluence {confluence}%")
+                     # 1. 🛡️ Confluence Barrier
+                     if confluence >= min_conf:
+                          # 2. ⚡ Trend Alignment Filter (Must not enter against immediate trend)
+                          trend_ok = True
+                          if 'Bullish' in signal and trend_5m < -5: trend_ok = False
+                          elif 'Bearish' in signal and trend_5m > 5: trend_ok = False
+                          
+                          if not trend_ok:
+                               print(f"[{sym}] Entry Blocked: Trend Misalignment ({trend_5m})")
+                          else:
+                               # 3. 🕰️ Cooldown Check
+                               ready, msg = trader.can_enter_position(sym)
+                               if not ready:
+                                    print(f"[{sym}] Entry Blocked: {msg}")
+                               else:
+                                    # 4. 📈 VIX Spike Safeguard
+                                    # (Heuristic: If vix_change > spike_limit, skip)
+                                    vix_spike_limit = 3.0
+                                    try:
+                                        with open("config.json", 'r') as f:
+                                            vix_spike_limit = json.load(f).get("VIX_SPIKE_LIMIT", 3.0)
+                                    except: pass
+                                    
+                                    current_extras = {}
+                                    if os.path.exists("data/market_extras.json"):
+                                         with open("data/market_extras.json", 'r') as f: current_extras = json.load(f)
+                                    
+                                    if current_extras.get("vix_change", 0) > vix_spike_limit:
+                                         print(f"[{sym}] Entry Blocked: VIX Spike ({current_extras.get('vix_change')}%)")
+                                    else:
+                                         trader.execute_trade(signal_data, sym, "AUTO", reason=f"Aggregated Signal ({signal}) Confluence {confluence}%")
                          
             except Exception as e:
                 print("Error in AutoTrade/PnL calculation:", e)

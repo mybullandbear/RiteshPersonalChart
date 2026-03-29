@@ -25,7 +25,8 @@ class PaperTrader:
                 "NIFTY": None,
                 "BANKNIFTY": None,
                 "FINNIFTY": None
-            }
+            },
+            "cooldowns": {}
         }
         if not os.path.exists(TRADING_STATE_FILE):
             return default_state
@@ -33,6 +34,7 @@ class PaperTrader:
             with open(TRADING_STATE_FILE, 'r') as f:
                 state = json.load(f)
                 state['paper_trading'] = True
+                if "cooldowns" not in state: state["cooldowns"] = {}
                 return state
         except:
             return default_state
@@ -202,9 +204,39 @@ class PaperTrader:
             except: pass
             
             state["positions"][symbol] = None
+            if "cooldowns" not in state: state["cooldowns"] = {}
+            state["cooldowns"][symbol] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
             self.save_trading_state(state)
             log_message(f"🛑 {symbol} Position Closed: {reason}")
             print(f"[{symbol}] Paper Position Closed: {reason}")
+
+    def can_enter_position(self, symbol):
+        """Verifies if enough time has passed since the last trade (Cooldown)."""
+        state = self.load_trading_state()
+        if state.get("positions", {}).get(symbol):
+            return False, "Position already active"
+            
+        last_exit_str = state.get("cooldowns", {}).get(symbol)
+        if not last_exit_str:
+            return True, "Ready"
+            
+        try:
+            last_exit = datetime.strptime(last_exit_str, "%Y-%m-%d %H:%M:%S")
+            diff = (datetime.now() - last_exit).total_seconds() / 60.0
+            
+            cooldown_min = 15
+            try:
+                with open("config.json", 'r') as f:
+                    cooldown_min = json.load(f).get("COOLDOWN_MINUTES", 15)
+            except: pass
+            
+            if diff < cooldown_min:
+                return False, f"Cooldown Active ({int(cooldown_min - diff)}m remaining)"
+        except:
+            pass
+            
+        return True, "Ready"
             
 
 

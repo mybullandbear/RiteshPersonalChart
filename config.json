@@ -10,5 +10,9 @@
     "BANKNIFTY_LOT": 30,
     "FINNIFTY_LOT": 40,
     "STOP_LOSS": 1500,
+    "MIN_CONFLUENCE": 80,
+    "SIGNAL_RATIO": 1.5,
+    "COOLDOWN_MINUTES": 15,
+    "VIX_SPIKE_LIMIT": 3.0,
     "app_password": "mybullandbearadmin"
 }

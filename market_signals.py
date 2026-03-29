@@ -49,13 +49,22 @@ def calculate_signal(session, symbol, timestamp, OptionChainData):
         sum_ce_chg_oi = sum(r.ce_change_oi or 0 for r in near_strikes)
         sum_pe_chg_oi = sum(r.pe_change_oi or 0 for r in near_strikes)
         
+        # Determine Dynamic Ratios from Config
+        signal_ratio = 1.15
+        try:
+            import json
+            if os.path.exists("config.json"):
+                with open("config.json", 'r') as f:
+                    signal_ratio = json.load(f).get("SIGNAL_RATIO", 1.5)
+        except: pass
+
         # Identify dominant market writing action
         ce_signal = ""
-        if sum_ce_chg_oi > 0 and (sum_pe_chg_oi <= 0 or sum_ce_chg_oi > sum_pe_chg_oi * 1.15):
+        if sum_ce_chg_oi > 0 and (sum_pe_chg_oi <= 0 or sum_ce_chg_oi > sum_pe_chg_oi * signal_ratio):
              ce_signal = "SELL CALL" # Bearish Sentiment
              
         pe_signal = ""
-        if sum_pe_chg_oi > 0 and (sum_ce_chg_oi <= 0 or sum_pe_chg_oi > sum_ce_chg_oi * 1.15):
+        if sum_pe_chg_oi > 0 and (sum_ce_chg_oi <= 0 or sum_pe_chg_oi > sum_ce_chg_oi * signal_ratio):
              pe_signal = "SELL PUT" # Bullish Sentiment
             
         # Conflict Resolution / Priority
