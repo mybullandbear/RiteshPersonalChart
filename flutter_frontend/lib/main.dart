@@ -76,6 +76,16 @@ const kHeaderStyle = TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letter
 const kSubStyle    = TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: kGrey, letterSpacing: 1.2);
 const kMono        = TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold);
 
+// ─── Top-level Sentiment Score Utility ─────────────────────────────────────
+// Pure function: no class dependency. Safe for all widget contexts.
+double _calcSentimentScore(QuickSummary? s) {
+  if (s == null) return 50.0;
+  double pcr = s.nearPcr ?? s.pcr;
+  double pcrScore = (((pcr - 0.5) / 1.0) * 100.0).clamp(0.0, 100.0);
+  double confScore = s.confluence.toDouble();
+  return (pcrScore * 0.4) + (confScore * 0.6);
+}
+
 // ─── Dashboard ─────────────────────────────────────────────────
 class TradingDashboard extends StatefulWidget {
   const TradingDashboard({super.key});
@@ -225,17 +235,8 @@ class _TradingDashboardState extends State<TradingDashboard> {
     }
   }
 
-  // Global utility for consistent sentiment scoring
-  static double getCompositeScore(QuickSummary? s) {
-    if (s == null) return 50.0;
-    double pcr = s.nearPcr ?? s.pcr;
-    double pcrScore = (((pcr - 0.5) / 1.0) * 100.0).clamp(0.0, 100.0);
-    double confScore = s.confluence.toDouble(); 
-    return (pcrScore * 0.4) + (confScore * 0.6);
-  }
-
   double _getCompositeScore(String sym) {
-    return _TradingDashboardState.getCompositeScore(_summary[sym]);
+    return _calcSentimentScore(_summary[sym]);
   }
 
   void _phase2and3() {
@@ -1003,9 +1004,9 @@ class _GlobalSignalsBar extends StatelessWidget {
     final String bSig = summary['BANKNIFTY']?.signal.toUpperCase() ?? '';
     final String fSig = summary['FINNIFTY']?.signal.toUpperCase() ?? '';
     
-    double nScore = _TradingDashboardState.getCompositeScore(summary['NIFTY']);
-    double bScore = _TradingDashboardState.getCompositeScore(summary['BANKNIFTY']);
-    double fScore = _TradingDashboardState.getCompositeScore(summary['FINNIFTY']);
+    double nScore = _calcSentimentScore(summary['NIFTY']);
+    double bScore = _calcSentimentScore(summary['BANKNIFTY']);
+    double fScore = _calcSentimentScore(summary['FINNIFTY']);
     double avgScore = (nScore + bScore + fScore) / 3.0;
     
     bool bullish = nSig.contains('BULLISH') && bSig.contains('BULLISH') && fSig.contains('BULLISH');
@@ -2804,7 +2805,7 @@ class _TripleIndexConfluence extends StatelessWidget {
   const _TripleIndexConfluence({required this.summary});
 
   double _getScoreForIndex(String sym) {
-    return _TradingDashboardState.getCompositeScore(summary[sym]);
+    return _calcSentimentScore(summary[sym]);
   }
 
   @override
