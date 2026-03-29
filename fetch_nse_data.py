@@ -347,7 +347,7 @@ def update_market_extras():
                         "symbol": t.replace(".NS",""), 
                         "price": round(curr, 2), 
                         "change": chg, 
-                        "weight": f"Wt: {wt}%"
+                        "weight": wt
                     })
                     
         with open(os.path.join(DATA_DIR, "market_extras.json"), 'w') as f:
