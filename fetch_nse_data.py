@@ -344,7 +344,10 @@ def update_market_extras():
                     prev = float(price_series.iloc[-2]) if len(price_series) > 1 else curr
                     chg = round(((curr - prev) / prev) * 100, 2) if prev > 0 else 0.0
                     extras["heavyweights"].append({
-                        "symbol": t.replace(".NS",""), "price": round(curr, 2), "change": chg, "weight": wt
+                        "symbol": t.replace(".NS",""), 
+                        "price": round(curr, 2), 
+                        "change": chg, 
+                        "weight": f"Wt: {wt}%"
                     })
                     
         with open(os.path.join(DATA_DIR, "market_extras.json"), 'w') as f:

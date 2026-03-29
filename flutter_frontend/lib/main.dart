@@ -225,18 +225,17 @@ class _TradingDashboardState extends State<TradingDashboard> {
     }
   }
 
-  double _getCompositeScore(String sym) {
-    final s = _summary[sym];
+  // Global utility for consistent sentiment scoring
+  static double getCompositeScore(QuickSummary? s) {
     if (s == null) return 50.0;
-    
-    // 1. Near-ATM PCR Sentiment Component (40%)
     double pcr = s.nearPcr ?? s.pcr;
     double pcrScore = (((pcr - 0.5) / 1.0) * 100.0).clamp(0.0, 100.0);
-    
-    // 2. Confluence Components & Signals (60% weight on intraday Delta OI)
-    double confScore = s.confluence.toDouble(); // Native 0 (Bear) to 100 (Bull)
-    
+    double confScore = s.confluence.toDouble(); 
     return (pcrScore * 0.4) + (confScore * 0.6);
+  }
+
+  double _getCompositeScore(String sym) {
+    return _TradingDashboardState.getCompositeScore(_summary[sym]);
   }
 
   void _phase2and3() {
@@ -681,7 +680,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
                           ],
                           Text(chg >= 0 ? '+$chg%' : '$chg%', style: TextStyle(color: chg >= 0 ? kGreen : kRed, fontWeight: FontWeight.w800, fontSize: 12)),
                           const SizedBox(width: 4),
-                          Text('($wt%)', style: const TextStyle(color: Colors.white24, fontSize: 10)),
+                          Text('Wt: $wt%', style: const TextStyle(color: Colors.white24, fontSize: 10)),
                        ]),
                     );
                  }).toList(),
@@ -743,10 +742,10 @@ class _TradingDashboardState extends State<TradingDashboard> {
     if (avgScore > 65) glowColor = kGreen;
     else if (avgScore < 35) glowColor = kRed;
 
-    String strategyText = "STRATEGY: NEUTRAL (Range)";
-    Color strategyColor = Colors.amber;
-    if (avgScore > 65) { strategyText = "STRATEGY: SELL PUT / BUY CE"; strategyColor = kGreen; }
-    else if (avgScore < 35) { strategyText = "STRATEGY: SELL CALL / BUY PE"; strategyColor = kRed; }
+    String strategyText = "SENTIMENT: NEUTRAL (Range)";
+    Color strategyColor = kOrange;
+    if (avgScore > 65) { strategyText = "SENTIMENT: BULLISH (Focus SELL PE)"; strategyColor = kGreen; }
+    else if (avgScore < 35) { strategyText = "SENTIMENT: BEARISH (Focus SELL CE)"; strategyColor = kRed; }
 
     final double width = MediaQuery.of(context).size.width;
     final bool isSmall = width < 900;
@@ -785,9 +784,9 @@ class _TradingDashboardState extends State<TradingDashboard> {
                   runSpacing: 40,
                   alignment: WrapAlignment.center,
                   children: [
-                    _SpeedometerGauge(score: nScore, label: 'NIFTY (${nPcr.toStringAsFixed(2)})'),
-                    _SpeedometerGauge(score: bScore, label: 'BANKNIFTY (${bPcr.toStringAsFixed(2)})'),
-                    _SpeedometerGauge(score: fScore, label: 'FINNIFTY (${fPcr.toStringAsFixed(2)})'),
+                    _SpeedometerGauge(score: nScore, label: 'NIFTY: ${nScore > 65 ? 'BULL' : (nScore < 35 ? 'BEAR' : 'NEUTRAL')} (${nPcr.toStringAsFixed(2)})'),
+                    _SpeedometerGauge(score: bScore, label: 'BANKNIFTY: ${bScore > 65 ? 'BULL' : (bScore < 35 ? 'BEAR' : 'NEUTRAL')} (${bPcr.toStringAsFixed(2)})'),
+                    _SpeedometerGauge(score: fScore, label: 'FINNIFTY: ${fScore > 65 ? 'BULL' : (fScore < 35 ? 'BEAR' : 'NEUTRAL')} (${fPcr.toStringAsFixed(2)})'),
                   ],
                 ),
               ],
@@ -800,9 +799,12 @@ class _TradingDashboardState extends State<TradingDashboard> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
-              color: strategyColor.withOpacity(0.15),
+              color: strategyColor.withOpacity(0.12),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: strategyColor.withOpacity(0.4), width: 1.5)
+              border: Border.all(color: strategyColor.withOpacity(0.3), width: 1.5),
+              boxShadow: [
+                 BoxShadow(color: strategyColor.withOpacity(0.05), blurRadius: 20, spreadRadius: -5)
+              ]
             ),
             child: Center(
               child: Text(
@@ -1035,9 +1037,9 @@ class _GlobalSignalsBar extends StatelessWidget {
                   height: 30,
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: confColor.withOpacity(0.1),
+                    color: (avgScore > 50 ? kGreen : kRed).withOpacity(0.12),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: confColor.withOpacity(0.3), width: 1.0)
+                    border: Border.all(color: (avgScore > 50 ? kGreen : kRed).withOpacity(0.3), width: 1.0)
                   ),
                   child: Center(
                     child: FittedBox(
@@ -2797,12 +2799,7 @@ class _TripleIndexConfluence extends StatelessWidget {
   const _TripleIndexConfluence({required this.summary});
 
   double _getScoreForIndex(String sym) {
-    final s = summary[sym];
-    if (s == null) return 50.0;
-    double pcr = s.nearPcr ?? s.pcr;
-    double pcrScore = (((pcr - 0.5) / 1.0) * 100.0).clamp(0.0, 100.0);
-    double confScore = s.confluence.toDouble(); 
-    return (pcrScore * 0.4) + (confScore * 0.6);
+    return _TradingDashboardState.getCompositeScore(summary[sym]);
   }
 
   @override

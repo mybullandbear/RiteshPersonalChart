@@ -932,9 +932,13 @@ def quick_summary():
                     print("Confluence calc error:", ce_err)
                     pass
 
-            # High OI Strikes fallback Support/Resistance
-            high_ce = max(rows, key=lambda x: x.ce_oi or 0, default=None)
-            high_pe = max(rows, key=lambda x: x.pe_oi or 0, default=None)
+            # 🎯 Smart Support & Resistance (Limited to +/- 15 strikes for relevance)
+            atm_strike = atm.strike_price if atm else spot_price
+            relevant_rows = [r for r in rows if abs(r.strike_price - atm_strike) <= (15 * 50 if sym == 'NIFTY' else 15 * 100)]
+            if not relevant_rows: relevant_rows = rows # Fallback
+            
+            high_ce = max(relevant_rows, key=lambda x: x.ce_oi or 0, default=None)
+            high_pe = max(relevant_rows, key=lambda x: x.pe_oi or 0, default=None)
 
             result[sym] = {
                 'spot':      spot_price,
