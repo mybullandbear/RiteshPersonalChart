@@ -160,7 +160,7 @@ class _TradingDashboardState extends State<TradingDashboard> {
     } catch (e) {
       setState(() {
         _initialLoading = false;
-        _error = 'Cannot connect to backend at http://127.0.0.1:5000\n\nError: $e';
+        _error = 'Cannot connect to backend at ${ApiService.baseUrl}\n\nError: $e';
       });
     }
   }
@@ -2325,7 +2325,7 @@ class _Spinner extends StatelessWidget {
       const SizedBox(height: 14),
       Text(label!, style: const TextStyle(color: Colors.white38, fontSize: 13)),
       const SizedBox(height: 6),
-      Text('http://127.0.0.1:5000',
+      Text(ApiService.baseUrl.replaceAll('/api',''),
         style: _mono.copyWith(color: Colors.white24, fontSize: 10)),
     ],
   ]);

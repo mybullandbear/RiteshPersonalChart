@@ -11,6 +11,8 @@ class ApiService {
     }
     return 'http://127.0.0.1:5000/api';
   }
+  static String get baseUrl => _base;
+
   static const _fast = Duration(seconds: 60);
   static const _slow = Duration(seconds: 120);
 
